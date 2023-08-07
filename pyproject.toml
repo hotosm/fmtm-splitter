@@ -1,0 +1,64 @@
+[project]
+name = "fmtm-splitter"
+dynamic = ["version"]
+description = "Split a project AOI into tasks"
+authors = [
+    {name = "Rob Savoye", email = "rob.savoye@hotosm.org"},
+]
+dependencies = [
+    "codetiming>=1.4.0",
+    "epdb>=0.15.1",
+    "geodex>=0.1.2",
+    "geojson>=2.5.0",
+    "progress>=1.6",
+    "shapely>=1.8.5",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+license = "GPL-3.0-only"
+keywords = ["fmtm", "odk", "hot"]
+classifiers = [
+    "Topic :: Utilities",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+]
+
+[project.urls]
+homepage = "https://github.com/hotosm/fmtm-splitter/wiki"
+documentation = "https://github.com/hotosm/fmtm-splitter/wiki"
+repository = "https://github.com/hotosm/fmtm-splitter"
+
+[project.optional-dependencies]
+[tool.pdm]
+version = {from = "fmtm_splitter/__version__.py"}
+[tool.pdm.build]
+includes = ["fmtm_splitter"]
+source-includes = ["tests", "LICENSE.md", "README.md"]
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest>=7.2.1",
+]
+
+[build-system]
+requires = ["pdm-pep517>=1.0.0"]
+build-backend = "pdm.pep517.api"
+
+[tool.pytest.ini_options]
+addopts = "-ra -q -p no:warnings"
+testpaths = [
+    "tests",
+]
+pythonpath = "fmtm_splitter"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_files = [
+    "pyproject.toml:version",
+    "fmtm_splitter/__version__.py",
+    "Makefile:VERSION",
+]
+
+[project.scripts]
+fmtm-splitter = "fmtm_splitter.FMTMSplitter:main"
