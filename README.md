@@ -1,2 +1,1 @@
-# fmtm-splitter
-A utility for splitting a polygon onto multiple tasks.
+A program to split polygons into tasks a varity of ways.
