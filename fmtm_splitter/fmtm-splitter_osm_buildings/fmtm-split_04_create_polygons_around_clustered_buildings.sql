@@ -32,8 +32,9 @@ SELECT Populate_Geometry_Columns('public.dumpedpoints'::regclass);
 CREATE INDEX dumpedpoints_idx
   ON dumpedpoints
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE dumpedpoints;
-
+COMMIT;
 --*******************voronoia****************************************
 DROP TABLE IF EXISTS voronoids;
 CREATE TABLE voronoids AS (
@@ -50,7 +51,9 @@ CREATE TABLE voronoids AS (
 CREATE INDEX voronoids_idx
   ON voronoids
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE voronoids;
+COMMIT;
 
 DROP TABLE IF EXISTS voronois;
 CREATE TABLE voronois AS (
@@ -61,7 +64,9 @@ CREATE TABLE voronois AS (
 CREATE INDEX voronois_idx
   ON voronois
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE voronois;
+COMMIT;
 
 DROP TABLE IF EXISTS unsimplifiedtaskpolygons;
 CREATE TABLE unsimplifiedtaskpolygons AS (
@@ -72,7 +77,9 @@ CREATE TABLE unsimplifiedtaskpolygons AS (
 CREATE INDEX unsimplifiedtaskpolygons_idx
   ON unsimplifiedtaskpolygons
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE unsimplifiedtaskpolygons;
+COMMIT;
 
 --*****************************Simplify*******************************
 -- Extract unique line segments
@@ -114,7 +121,8 @@ SELECT Populate_Geometry_Columns('public.taskpolygons'::regclass);
 CREATE INDEX taskpolygons_idx
   ON taskpolygons
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE taskpolygons;
-
+COMMIT;
 -- Clean results (nuke or merge polygons without features in them)
 

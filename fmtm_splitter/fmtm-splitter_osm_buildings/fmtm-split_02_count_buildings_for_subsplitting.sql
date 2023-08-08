@@ -35,8 +35,9 @@ CREATE INDEX buildings_idx
   ON buildings
   USING GIST (geom);
 -- Clean up the table which may have gaps and stuff from spatial indexing
+COMMIT;
 VACUUM ANALYZE buildings;
-
+COMMIT;
 --**************************Count features in polygons*****************
 DROP TABLE IF EXISTS splitpolygons;
 CREATE TABLE splitpolygons AS (
@@ -58,7 +59,9 @@ SELECT Populate_Geometry_Columns('public.splitpolygons'::regclass);
 CREATE INDEX splitpolygons_idx
   ON splitpolygons
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE splitpolygons;
+COMMIT;
 
 DROP TABLE IF EXISTS lowfeaturecountpolygons;
 CREATE TABLE lowfeaturecountpolygons AS (
@@ -100,7 +103,8 @@ SELECT Populate_Geometry_Columns('public.lowfeaturecountpolygons'::regclass);
 CREATE INDEX lowfeaturecountpolygons_idx
   ON lowfeaturecountpolygons
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE lowfeaturecountpolygons;
-
+COMMIT;
 --****************Merge low feature count polygons with neighbors*******
 -- NOT IMPLEMENTED YET; not absolutely essential but highly desirable

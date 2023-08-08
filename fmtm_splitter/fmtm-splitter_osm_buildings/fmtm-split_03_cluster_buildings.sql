@@ -60,4 +60,6 @@ SELECT Populate_Geometry_Columns('public.clusteredbuildings'::regclass);
 CREATE INDEX clusteredbuildings_idx
   ON clusteredbuildings
   USING GIST (geom);
+COMMIT;
 VACUUM ANALYZE clusteredbuildings;
+COMMIT;

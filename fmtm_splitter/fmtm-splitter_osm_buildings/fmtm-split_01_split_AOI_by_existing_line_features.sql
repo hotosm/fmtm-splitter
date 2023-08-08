@@ -28,7 +28,7 @@ DROP TABLE IF EXISTS polygonsnocount;
 CREATE TABLE polygonsnocount AS (
   -- The Area of Interest provided by the person creating the project
   WITH aoi AS (
-    SELECT * FROM "project-aoi"
+    SELECT * FROM "project_aoi"
   )
   -- Extract all lines to be used as splitlines from a table of lines
   -- with the schema from Underpass (all tags as jsonb column called 'tags')
@@ -103,4 +103,6 @@ CREATE INDEX polygonsnocount_idx
   ON polygonsnocount
   USING GIST (geom);
 -- Clean up the table which may have gaps and stuff from spatial indexing
+COMMIT;
 VACUUM ANALYZE polygonsnocount;
+COMMIT;
