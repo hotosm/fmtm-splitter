@@ -112,7 +112,9 @@ class FMTMSplitter(object):
         # aoi.to_postgis('lines_view', con, if_exists='replace')
         dbcursor.execute(view)
         
-        dbcursor.execute(sql)
+        nbuildings = 5
+        query = sql.replace('{nbuildings}', str(nbuildings))
+        dbcursor.execute(query)
         result = dbcursor.fetchall()
         log.info(f"Query returned {len(result[0][0]['features'])}")
         features = result[0][0]['features']
