@@ -90,6 +90,7 @@ class FMTMSplitter(object):
                    aoi: gpd.GeoDataFrame,
                    sql: str,
                    dburl: dict,
+                   buildings: int
                    ):
         """Split the polygon by features in the database using an SQL query"""
 
@@ -102,18 +103,17 @@ class FMTMSplitter(object):
         # df = gpd.read_postgis(sql, con)
         # return df
 
+        # geopandas can't handle views
         # So instead do it the manual way
         dbshell = psycopg2.connect(dburl)
         dbshell.autocommit = True
         dbcursor = dbshell.cursor()
         text = geojson.loads(aoi.to_json())
         view = f"DROP VIEW IF EXISTS lines_view;CREATE VIEW lines_view AS SELECT tags,geom FROM ways_line WHERE ST_CONTAINS(ST_GeomFromGeoJson('{text['features'][0]['geometry']}'), geom)"
-        # geopandas can't handle views
         # aoi.to_postgis('lines_view', con, if_exists='replace')
         dbcursor.execute(view)
         
-        nbuildings = 5
-        query = sql.replace('{nbuildings}', str(nbuildings))
+        query = sql.replace('{nbuildings}', str(buildings))
         dbcursor.execute(query)
         result = dbcursor.fetchall()
         log.info(f"Query returned {len(result[0][0]['features'])}")
@@ -148,21 +148,31 @@ This program splits a Polygon (the Area Of Interest)
 be either the data extract used by the XLSForm, or a postgresql database.
 
     examples:
-        fmtm-splitter -b AOI 
+        fmtm-splitter -b AOI
         fmtm-splitter -v -b AOI -s data.geojson
         fmtm-splitter -v -b AOI -s PG:colorado
         
         Where AOI is the boundary of the project as a polygon
         And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
-        The task splitting defaults to squares, 50 meters across
+        The task splitting defaults to squares, 50 meters across. If -m is used
+        then that also defaults to square splitting.
+
+        fmtm-splitter -b AOI -b 20 -c custom.sql
+        This will use a custom SQL query for splitting by map feature, and adjust task
+        sizes based on the number of buildings.
         """
     )
+    # the size of each task wheh using square splitting
     meters = 50
+    # the number of buildings in a task when using feature splitting
+    buildings = 5
+    # The default SQL query for feature splitting
     query = 'fmtm_algorithm.sql'
     parser.add_argument("-v", "--verbose",  action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile", default='fmtm.geojson', help="Output file from splitting")
     # parser.add_argument("-a", "--algorythm", default='squares', choices=choices, help="Splitting Algorthm to use")
     parser.add_argument("-m", "--meters", help="Size in meters if using square splitting")
+    parser.add_argument("-number", "--number", default=buildings, help="Number of buildings in a task")
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
     parser.add_argument("-c", "--custom", help="Custom SQL query for database]")
@@ -209,7 +219,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
         query = sqlfile.read()
         # dburl = "postgresql://myusername:mypassword@myhost:5432/mydatabase"
         dburl = "postgresql://localhost:5432/colorado"
-        features = splitter.splitBySQL(aoi, query, dburl)
+        features = splitter.splitBySQL(aoi, query, dburl, args.number)
         # features.to_file('splitBySQL.geojson', driver='GeoJSON')
         collection = FeatureCollection(features)
         out = open('splitBySQL.geojson', 'w')
