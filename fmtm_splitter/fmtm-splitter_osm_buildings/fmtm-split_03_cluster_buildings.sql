@@ -1,4 +1,4 @@
- /*
+/*
 Licence: GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
 Part of the HOT Field Mapping Tasking Manager (FMTM)
 
@@ -60,6 +60,6 @@ SELECT Populate_Geometry_Columns('public.clusteredbuildings'::regclass);
 CREATE INDEX clusteredbuildings_idx
   ON clusteredbuildings
   USING GIST (geom);
-COMMIT;
-VACUUM ANALYZE clusteredbuildings;
-COMMIT;
+
+--VACUUM ANALYZE clusteredbuildings;
+

@@ -21,13 +21,8 @@ import argparse
 import sys
 import os
 from sys import argv
-from datetime import datetime
-from codetiming import Timer
-from progress.bar import Bar, PixelBar
-from progress.spinner import PixelSpinner
 import psycopg2
 from osgeo import gdal
-#import json
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -40,17 +35,12 @@ class FMTMSplitter(object):
                  aoi: str, # GeoJSON polygon filepath
                  algorithm: str = None,
                  ):
-        self.size = 50          # 50 meters
         self.aoi = aoi
         self.algorithm = algorithm
         if algorithm == 'squares':
             self.splitBySquare(self.size)
         elif algorithm == 'buildings':
             self.splitByBuildings
-        elif algorithm == 'osm':
-            pass
-        elif algorithm == 'custom':
-            pass
 
     def splitByBuildings(self,
                          aoi: str, # GeoJSON polygon input file
@@ -58,25 +48,30 @@ class FMTMSplitter(object):
                          dbd: list, # database host, dbname, user, password
                          ):
         """Split the polygon by buildings in the database using an SQL query"""
-
         dbstring = (f"PG:host={dbd[0]} dbname={dbd[1]} "
                     f"user={dbd[2]} password={dbd[3]}")
-        print(f'\nThe dbstring will be {dbstring} when that is working.\n')
-        # Add the AOI to the database
-        #gdal.VectorTranslate(dbstring, aoi, layerName='project_aoi')
-        
         dbshell = psycopg2.connect(host=dbd[0], database = dbd[1],
-                                user = dbd[2], password = dbd[3])
+                                   user = dbd[2], password = dbd[3])  
         dbshell.autocommit = True
-        dbcursor = dbshell.cursor()    
+        dbcursor = dbshell.cursor()
+        dbcursor.execute('DROP TABLE IF EXISTS aoi;')
+        # Add the AOI to the database
+        log.info(f'Writing {aoi} to database as aoi layer.')
+        gdal.VectorTranslate(dbstring, aoi, layerName='aoi')
+        dbcursor.execute('DROP TABLE IF EXISTS project_aoi;'
+                         'CREATE TABLE project_aoi AS (SELECT '
+                         'ogc_fid as fid,wkb_geometry AS geom FROM aoi);'
+                         'ALTER TABLE project_aoi ADD PRIMARY KEY(fid);'
+                         'CREATE INDEX project_aoi_idx '
+                         'ON project_aoi USING GIST (geom);'
+                         'DROP TABLE aoi;')
+        dbcursor.execute('VACUUM ANALYZE')
         for query in queries:
             dbcursor.execute(query)
-            result = dbcursor.fetchall()
-            log.info(f"Query returned {len(result[0][0]['features'])}")
-        # features = result[0][0]['features']
-        return features
-        
-def main():
+            dbcursor.execute('VACUUM ANALYZE')
+        log.info('Might very well have completed successfully')
+
+if __name__ == "__main__":
     # Command Line options
     parser = argparse.ArgumentParser(
         prog="FMTMSplitter.py",
@@ -147,14 +142,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
     aoi = args.boundary
     splitter = FMTMSplitter(aoi)
 
-    if args.meters:
-        # split the AOI into squares
-        log.debug(f"Splitting the AOI by squares")
-        tasks = splitter.splitBySquare(args.meters)
-        jsonfile = open(args.outfile, "w")
-        dump(tasks, jsonfile)
-        log.debug(f"Wrote {args.outfile}")
-    elif args.algorithm == 'buildings':
+    if args.algorithm == 'buildings':
         log.debug(f"Splitting the AOI by SQL query")
         modulardir = os.path.join(os.path.dirname(__file__),
                                   'fmtm-splitter_osm_buildings')
@@ -174,17 +162,6 @@ be either the data extract used by the XLSForm, or a postgresql database.
                                              modularqueries,
                                              dbdetails)
         log.info(f"Wrote splitBySQL.geojson")
-    elif args.source and args.source[3:] != 'PG:':
-        log.debug(f"Splitting the AOI using a data extract")
-        # split the AOI using features in a data file
-        indata = gpd.GeoDataFrame.from_file(args.source)
-        # indata.query('highway', inplace=True)
-        features = splitter.splitByFeature(aoi, indata)
-        features.to_file('splitByFeature.geojson', driver='GeoJSON')
-        log.info(f"Wrote splitByFeature.geojson")
 
-        # log.info(f"Wrote {args.outfile}")
 
-if __name__ == "__main__":
-    main()
 

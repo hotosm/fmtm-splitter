@@ -46,28 +46,13 @@ CREATE TABLE polygonsnocount AS (
       OR tags->>'railway' IS NOT NULL
       )
   )
+
   -- Merge all lines, necessary so that the polygonize function works later
-  ,partlymerged AS (
+  ,merged AS (
     SELECT ST_LineMerge(ST_Union(splitlines.geom)) AS geom
     FROM splitlines
   )
-  -- Add closed ways (polygons) that are actually roads (like roundabouts)
-  ,polyroads AS (
-    SELECT ST_Boundary(wp.geom) AS geom
-    FROM aoi a, "ways_poly" wp
-    WHERE ST_Intersects(a.geom, wp.geom)
-    AND tags->>'highway' IS NOT NULL
-  )
-  -- Merge all the lines from closed ways
-  ,prmerged AS (
-    SELECT ST_LineMerge(ST_Union(polyroads.geom)) AS geom
-    from polyroads
-  )
-  -- Add them to the merged lines from the open ways
-  ,merged AS (
-    SELECT ST_Union(partlymerged.geom, prmerged.geom) AS geom
-    FROM partlymerged, prmerged
-  )
+
   -- Combine the boundary of the AOI with the splitlines
   -- First extract the Area of Interest boundary as a line
   ,boundary AS (
@@ -103,6 +88,37 @@ CREATE INDEX polygonsnocount_idx
   ON polygonsnocount
   USING GIST (geom);
 -- Clean up the table which may have gaps and stuff from spatial indexing
-COMMIT;
-VACUUM ANALYZE polygonsnocount;
-COMMIT;
+
+-- For use with psycopg2, vaccum analyze needs to happen after commit
+--VACUUM ANALYZE polygonsnocount;
+
+
+
+/*
+-- This snippet works when there are polygon (closed way) roads,
+-- but fails if not. Implement when we figure out how to handle
+-- an empty layer of road polygons.
+--************************************************************************
+  -- Merge all lines, necessary so that the polygonize function works later
+  ,partlymerged AS (
+    SELECT ST_LineMerge(ST_Union(splitlines.geom)) AS geom
+    FROM splitlines
+  )
+  -- Add closed ways (polygons) that are actually roads (like roundabouts)
+  ,polyroads AS (
+    SELECT ST_Boundary(wp.geom) AS geom
+    FROM aoi a, "ways_poly" wp
+    WHERE ST_Intersects(a.geom, wp.geom)
+    AND tags->>'highway' IS NOT NULL
+  )
+  -- Merge all the lines from closed ways
+  ,prmerged AS (
+    SELECT ST_LineMerge(ST_Union(polyroads.geom)) AS geom
+    from polyroads
+  )
+  -- Add them to the merged lines from the open ways
+  ,merged AS (
+    SELECT ST_Union(partlymerged.geom, prmerged.geom) AS geom
+    FROM partlymerged, prmerged
+  )
+*/
