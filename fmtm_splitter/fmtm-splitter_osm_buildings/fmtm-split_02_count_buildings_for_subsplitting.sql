@@ -69,8 +69,7 @@ CREATE TABLE lowfeaturecountpolygons AS (
   WITH lowfeaturecountpolys as (
     SELECT *
     FROM splitpolygons AS p
-    -- TODO: feature count should not be hard-coded
-    WHERE p.numfeatures < 20  
+    WHERE p.numfeatures < {%numfeatures%} 
   ), 
   -- Find the neighbors of the low-feature-count polygons
   -- Store their ids as n_polyid, numfeatures as n_numfeatures, etc

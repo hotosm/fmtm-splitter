@@ -33,13 +33,11 @@ class FMTMSplitter(object):
     """A class to split polygons"""
     def __init__(self,
                  aoi: str, # GeoJSON polygon filepath
-                 algorithm: str = None,
+                 algorithm: str=None,
                  ):
         self.aoi = aoi
         self.algorithm = algorithm
-        if algorithm == 'squares':
-            self.splitBySquare(self.size)
-        elif algorithm == 'buildings':
+        if algorithm == 'buildings':
             self.splitByBuildings
 
     def splitByBuildings(self,
@@ -78,10 +76,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="This program splits a Polygon AOI into tasks",
         epilog="""
-This program splits a Polygon (the Area Of Interest)
-
-        The data source for existing data can'
-be either the data extract used by the XLSForm, or a postgresql database.
+    This program splits a Polygon (the Area Of Interest)
 
     examples:
         fmtm-splitter -b AOI 
@@ -89,13 +84,13 @@ be either the data extract used by the XLSForm, or a postgresql database.
         fmtm-splitter -v -b AOI -s PG:colorado
         
         Where AOI is the boundary of the project as a polygon
-        And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
-        The task splitting defaults to squares, 50 meters across
+        And OUTFILE is a MultiPolygon output file, defaults to fmtm.geojson
         """
     )
-    meters = 50
     parser.add_argument("-b", "--boundary", required=True,
                         help="Polygon AOI GeoJSON file")
+    parser.add_argument("-n", "--numfeatures", default=20,
+                        help="Number of features on average desired per task")
     parser.add_argument("-v", "--verbose",
                         action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile",
@@ -156,12 +151,14 @@ be either the data extract used by the XLSForm, or a postgresql database.
         modularqueries = []
         for sqlfile in modularsqlfiles:
             with open(os.path.join(modulardir, sqlfile), 'r') as sql:
-                modularqueries.append(sql.read())
+                modularqueries.append(sql.read()
+                                      .replace('{%numfeatures%}',
+                                               str(args.numfeatures)))
         dbdetails = [args.host, args.database, args.user, args.password]
         features = splitter.splitByBuildings(aoi,
                                              modularqueries,
                                              dbdetails)
-        log.info(f"Wrote splitBySQL.geojson")
+        #log.info(f"Wrote splitBySQL.geojson")
 
 
 
