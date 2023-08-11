@@ -31,12 +31,19 @@ def osm2pgsql(infile, dbd):
     """
     try:
         print(f'Trying to turn {infile} into a PostGIS layer')
-        #osm2pgsql --create -H localhost -U user -P 5432 -d dbname -W --extra-attributes --output=flex --style raw.lua infile.osm' 
-        p = subprocess.run(["osm2pgsql", infile],
-                           capture_output=True, encoding='utf-8')
+        #osm2pgsql --create -d postgresql://ivan:plumpynut@localhost/splittest --extra-attributes --output=flex --style fmtm_splitter/raw.lua /home/ivan/Documents/Maps/Kathmandu_fmtm_test/Baluwatar/2023_08_12_Baluwatar_testoid.osm
+
+        style = os.path.join('fmtm_splitter','raw.lua')
+        pg = ["osm2pgsql", "--create",
+              "-d", f"postgresql://{dbd[0]}:{dbd[1]}@{dbd[2]}/{dbd[3]}",
+              "--extra-attributes", "--output=flex",
+              "--style", style, infile]
+        print(pg)
+        p = subprocess.run(pg, capture_output=True, encoding='utf-8')
         response = p.stdout
+        error = p.stderr
         print(f'osm2pgsql seems to have accepted {infile} and '\
-              f'returned something of type {type(response)}')
+              f'returned {response} \nand\n{error}')
         return response
     except Exception as e:
         print(e)
@@ -77,5 +84,5 @@ if __name__ == "__main__":
         of.write(data)
         print(f'Wrote {osmfilepath}')
     
-    dbdetails = [args.host, args.database, args.user, args.password]
+    dbdetails = [args.user, args.password, args.host, args.database]
     dbpush = osm2pgsql(osmfilepath, dbdetails)
