@@ -4,12 +4,24 @@ import sys, os
 import argparse
 import requests
 from datetime import datetime
-from osgeo import gdal
+from osgeo import ogr
 import subprocess
 
+def aoiextent(aoifile):
+    """
+    Accept a GeoJSON file, return its extent as a bbox string
+    """
+    indriver = ogr.GetDriverByName('GeoJSON')
+    indata = indriver.Open(aoifile)
+    inlayer = indata.GetLayer()
+    e = list(inlayer.GetExtent())
+    bboxstring = f'{e[2]},{e[0]},{e[3]},{e[1]}'
+    return(bboxstring)
+    
 def query(query_string, overpass_url):
-    """Accept a query in Overpass API query language,
-       return an osm dataset.
+    """
+    Accept a query in Overpass API query language,
+    return an osm dataset.
     """
     try:
         response = requests.get(overpass_url,
@@ -25,20 +37,18 @@ def query(query_string, overpass_url):
         print("Yeah, that didn't work. We reached the Overpass API but "\
               "something went wrong on the server side.")
 
-def osm2pgsql(infile, dbd):
+def dbpush(infile, dbd):
     """
-
+    Accept an osm file, push it to PostGIS layers using the Underpass schema
     """
     try:
         print(f'Trying to turn {infile} into a PostGIS layer')
-        #osm2pgsql --create -d postgresql://ivan:plumpynut@localhost/splittest --extra-attributes --output=flex --style fmtm_splitter/raw.lua /home/ivan/Documents/Maps/Kathmandu_fmtm_test/Baluwatar/2023_08_12_Baluwatar_testoid.osm
-
         style = os.path.join('fmtm_splitter','raw.lua')
         pg = ["osm2pgsql", "--create",
               "-d", f"postgresql://{dbd[0]}:{dbd[1]}@{dbd[2]}/{dbd[3]}",
               "--extra-attributes", "--output=flex",
               "--style", style, infile]
-        print(pg)
+        print(pg) # just to visually check that this command makes sense
         p = subprocess.run(pg, capture_output=True, encoding='utf-8')
         response = p.stdout
         error = p.stderr
@@ -74,15 +84,13 @@ if __name__ == "__main__":
     osmfilepath = f'{dirdate}_{basename_no_ext}.osm'
     
     q = open(args.query)
-    aoi = open(args.boundary)
     # TODO get bbox from GeoJSON aoi
-    bbox = '27.726144,85.323000,27.733567,85.331926'
+    bbox = aoiextent(args.boundary)
     qstring = q.read().replace('{{bbox}}', bbox)
-    print(qstring)
     data = query(qstring, args.overpass_url)
     with open(osmfilepath, 'w') as of:
         of.write(data)
         print(f'Wrote {osmfilepath}')
     
     dbdetails = [args.user, args.password, args.host, args.database]
-    dbpush = osm2pgsql(osmfilepath, dbdetails)
+    dblayers = dbpush(osmfilepath, dbdetails)
