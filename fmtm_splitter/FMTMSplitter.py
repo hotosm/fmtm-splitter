@@ -50,6 +50,16 @@ class FMTMSplitter(object):
                  boundary: gpd.GeoDataFrame,
                  algorythm: str = None,
                  ):
+        """
+        This class splits a polygon into tasks using a variety of algorythms.
+
+        Args:
+            boundary (FeatureCollection): The boundary polygon
+            algorythm (str): The splitting algorythm to use
+
+        Returns:
+            instance (FMTMSplitter): An instance of this class
+        """
         self.size = 50          # 50 meters
         self.boundary = boundary
         self.algorythm = algorythm
@@ -63,7 +73,15 @@ class FMTMSplitter(object):
     def splitBySquare(self,
                       meters: int,
                       ):
-        """Split the polygon into squares. The size is in meters"""
+        """
+        Split the polygon into squares.
+
+        Args:
+            meters (int):  The size of each task square in meters
+
+        Returns:
+            data (FeatureCollection): A multipolygon of all the task boundaries
+        """
         gdf = gpd.GeoDataFrame.from_features(self.boundary)
 
         xmin, ymin, xmax, ymax = gdf.total_bounds
@@ -92,7 +110,18 @@ class FMTMSplitter(object):
                    dburl: dict,
                    buildings: int
                    ):
-        """Split the polygon by features in the database using an SQL query"""
+        """
+        Split the polygon by features in the database using an SQL query
+
+        Args:
+            aoi (DataFrame): The project boundary
+            sql (str): The SQL query to execute
+            dburl (str): The database URI
+            buildings (int): The number of buildings in each task
+
+        Returns:
+            data (FeatureCollection): A multipolygon of all the task boundaries
+        """
 
         # Create a table with the project AOI
         con = create_engine(dburl)
@@ -134,9 +163,11 @@ class FMTMSplitter(object):
         gdf = gpd.GeoDataFrame.from_features(features)
         polygons = gpd.GeoSeries(polygonize(gdf.geometry))
         return polygons
-        
+
 def main():
-    # Command Line options
+    """
+    This main function lets this class be run standalone by a bash script
+    """
     parser = argparse.ArgumentParser(
         prog="FMTMSplitter.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -237,5 +268,6 @@ be either the data extract used by the XLSForm, or a postgresql database.
         # log.info(f"Wrote {args.outfile}")
 
 if __name__ == "__main__":
+    """This is just a hook so this file can be run standlone during development."""
     main()
 
