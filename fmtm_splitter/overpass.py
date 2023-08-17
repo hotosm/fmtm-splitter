@@ -45,7 +45,8 @@ def dbpush(infile, dbd):
         print(f'Trying to turn {infile} into a PostGIS layer')
         style = os.path.join('fmtm_splitter','raw.lua')
         pg = ["osm2pgsql", "--create",
-              "-d", f"postgresql://{dbd[0]}:{dbd[1]}@{dbd[2]}/{dbd[3]}",
+              "-d",
+              f"postgresql://{dbd[0]}:{dbd[1]}@{dbd[2]}:{dbd[4]}/{dbd[3]}",
               "--extra-attributes", "--output=flex",
               "--style", style, infile]
         print(pg) # just to visually check that this command makes sense
@@ -69,10 +70,12 @@ if __name__ == "__main__":
     p.add_argument('-url', '--overpass_url', help='Overpass API server URL',
                    default="https://overpass.kumi.systems/api/interpreter")
     p.add_argument("-ho", "--host", help="Database host",
-                        default='localhost')
+                   default='localhost')
     p.add_argument("-db", "--database", help="Database to use")
     p.add_argument("-u", "--user", help="Database username")
     p.add_argument("-p", "--password", help="Database password")
+    p.add_argument("-po", "--port", help="Database port",
+                   default='5432')
 
     args = p.parse_args()
 
@@ -92,5 +95,5 @@ if __name__ == "__main__":
         of.write(data)
         print(f'Wrote {osmfilepath}')
     
-    dbdetails = [args.user, args.password, args.host, args.database]
+    dbdetails = [args.user, args.password, args.host, args.database, args.port]
     dblayers = dbpush(osmfilepath, dbdetails)
