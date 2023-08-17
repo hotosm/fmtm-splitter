@@ -1,0 +1,9 @@
+site_name: fmtm-splitter
+site_url: https://github.com/hotosm/fmtm-splitter/wiki
+nav:
+  - Home: Home.md
+  - About: about.md
+
+plugins:
+  - search
+  - mkdocstrings
