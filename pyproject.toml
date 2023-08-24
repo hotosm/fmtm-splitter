@@ -48,6 +48,7 @@ version = "0.1.0"
 version_files = [
     "pyproject.toml:version",
     "fmtm_splitter/__version__.py",
+    "build_imgs.sh:PKG_VERSION",
 ]
 
 [tool.pdm]
