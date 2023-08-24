@@ -31,23 +31,23 @@ tasks.
 
 # The fmtm-splitter program
 
-	options:
-	-h, --help                       show this help message and exit
-	-v, --verbose                    verbose output
-	-o OUTFILE, --outfile OUTFILE    Output file from splitting
-	-m METERS, --meters METERS       Size in meters if using square splitting
-	-b BOUNDARY, --boundary BOUNDARY Polygon AOI
-	-s SOURCE, --source SOURCE       Source data, Geojson or PG:[dbname]
-	-c CUSTOM, --custom CUSTOM       Custom SQL query for database]
+    options:
+    -h, --help                       show this help message and exit
+    -v, --verbose                    verbose output
+    -o OUTFILE, --outfile OUTFILE    Output file from splitting
+    -m METERS, --meters METERS       Size in meters if using square splitting
+    -b BOUNDARY, --boundary BOUNDARY Polygon AOI
+    -s SOURCE, --source SOURCE       Source data, Geojson or PG:[dbname]
+    -c CUSTOM, --custom CUSTOM       Custom SQL query for database]
 
 This program splits a Polygon (the Area Of Interest)
 The data source for existing data can'be either the data extract used by the XLSForm, or a postgresql database.
 
     examples:
-        fmtm-splitter -b AOI 
+        fmtm-splitter -b AOI
         fmtm-splitter -v -b AOI -s data.geojson
         fmtm-splitter -v -b AOI -s PG:colorado
-        
+
         Where AOI is the boundary of the project as a polygon
         And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
         The task splitting defaults to squares, 50 meters across
