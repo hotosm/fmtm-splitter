@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 [project.urls]
-homepage = "https://github.com/hotosm/fmtm-splitter/wiki"
+homepage = "https://hotosm.github.io/fmtm-splitter"
 documentation = "https://hotosm.github.io/fmtm-splitter"
 repository = "https://github.com/hotosm/fmtm-splitter"
 
