@@ -2,11 +2,11 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "docs", "debug", "dev", "test"]
+groups = ["default", "docs", "test", "debug", "dev"]
 cross_platform = true
 static_urls = false
 lock_version = "4.3"
-content_hash = "sha256:5d6b12d565721bcb480c736fc02cb5a36f78cefcf81f0e71c948ac7172790676"
+content_hash = "sha256:2c04b1c25f1a2194eccc4075d89ccb97e77048fc4c1c86877030fa8635fcc445"
 
 [[package]]
 name = "appnope"
@@ -690,7 +690,7 @@ files = [
 
 [[package]]
 name = "mkdocstrings-python"
-version = "1.5.1"
+version = "1.5.2"
 requires_python = ">=3.8"
 summary = "A Python handler for mkdocstrings."
 dependencies = [
@@ -698,8 +698,8 @@ dependencies = [
     "mkdocstrings>=0.20",
 ]
 files = [
-    {file = "mkdocstrings_python-1.5.1-py3-none-any.whl", hash = "sha256:47ef2fa3cfa62f30b4489cee9dd5e6463fd053830e8be0537470947681c9e4e0"},
-    {file = "mkdocstrings_python-1.5.1.tar.gz", hash = "sha256:29673d85ba8604968b7a828f42b1fd754aae2a83e73490df8926529cd860da3b"},
+    {file = "mkdocstrings_python-1.5.2-py3-none-any.whl", hash = "sha256:ed37ca6d216986e2ac3530c19c3e7be381d1e3d09ea414e4ff467d6fd2cbd9c1"},
+    {file = "mkdocstrings_python-1.5.2.tar.gz", hash = "sha256:81eb4a93bc454a253daf247d1a11397c435d641c64fa165324c17c06170b1dfb"},
 ]
 
 [[package]]
