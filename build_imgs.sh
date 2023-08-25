@@ -11,7 +11,7 @@ docker build . \
 
 docker push "ghcr.io/hotosm/fmtm-splitter:${PKG_VERSION}"
 
-docker build . --push \
+docker build . \
     -t ghcr.io/hotosm/fmtm-splitter:ci \
     --target ci \
     --build-arg PKG_VERSION="${PKG_VERSION}"
