@@ -1,0 +1,9 @@
+# Ignore everything
+**
+
+# Allow files and directories
+!fmtm_splitter
+!pyproject.toml
+!pdm.lock
+!README.md
+!LICENSE.md
