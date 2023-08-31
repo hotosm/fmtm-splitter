@@ -1,5 +1,7 @@
 # fmtm-splitter
 
+🕮 [Documentation](https://hotosm.github.io/fmtm-splitter/)
+
 This is a program to split polygons into tasks using a variety of
 algorythms. It is a class that can be used by other projects, but also
 a standalone program. It was originally developed for the
