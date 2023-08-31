@@ -29,7 +29,7 @@ jobs:
         run: >
           docker run -d --name fmtm_pytest
           -v "$GITHUB_WORKSPACE/fmtm_splitter:/home/appuser/.local/lib/python3.10/site-packages/fmtm_splitter"
-          -v "$GITHUB_WORKSPACE/tests:/home/appuser/tests"
+          -v "$GITHUB_WORKSPACE/tests:/data/tests"
           ghcr.io/hotosm/fmtm-splitter:ci
           sleep infinity
 
