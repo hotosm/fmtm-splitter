@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - "*"
+    paths:
+      # Workflow is triggered only if code or tests change
+      - "fmtm_splitter"
+      - "tests"
   # Run tests on PR, prior to merge to main & development.
   pull_request:
     branches:
