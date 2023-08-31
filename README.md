@@ -11,6 +11,36 @@ converted so it can be used by multiple projects.
 The class takes GeoJson Polygon as an input, and returns a GeoJson
 file Multipolygon of all the task boundaries.
 
+## Installation
+
+To install fmtm-splitter, you can use pip. Here are two options:
+
+- Directly from the main branch:
+  `pip install git+https://github.com/hotosm/fmtm-splitter.git`
+
+- Latest on PyPi:
+  `pip install fmtm-splitter`
+
+
+## Using the Container Image
+
+- fmtm-splitter scripts can be used via the pre-built container images.
+- These images come with all dependencies bundled, so are simple to run.
+
+Run a specific command:
+
+```bash
+docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:0.1.0 fmtm-splitter
+```
+
+Run interactively (to use multiple commands):
+
+```bash
+docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:0.1.0
+```
+
+> Note: the output directory should always be /data/... to persist data.
+
 ## Split By Square
 
 The default is to split the polygon into squares. The default
