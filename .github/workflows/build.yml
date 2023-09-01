@@ -1,13 +1,8 @@
-name: Build and Deploy
+name: Build
 
 on:
-  # Push includes PR merge
-  push:
-    branches:
-      - main
-    paths:
-      # Workflow is triggered only if src changes
-      - "src/**"
+  release:
+    types: [published]
   # Allow manual trigger
   workflow_dispatch:
 
@@ -38,8 +33,7 @@ jobs:
       - name: Extract version
         id: extract_api_version
         run: |
-          cd src/backend
-          echo "PKG_VERSION=$(python -c 'from app.__version__ import __version__; print(__version__)')" >> $GITHUB_ENV
+          echo "PKG_VERSION=$(python -c 'from fmtm_splitter.__version__ import __version__; print(__version__)')" >> $GITHUB_ENV
 
       - name: Build image
         uses: docker/build-push-action@v4
@@ -48,7 +42,7 @@ jobs:
           target: prod
           push: true
           tags: |
-            "ghcr.io/hotosm/fmtm/fmtm-splitter:${{ env.PKG_VERSION }}"
-            "ghcr.io/hotosm/fmtm/fmtm-splitter:latest"
+            "ghcr.io/hotosm/fmtm-splitter:${{ env.PKG_VERSION }}"
+            "ghcr.io/hotosm/fmtm-splitter:latest"
           build-args: |
             PKG_VERSION=${{ env.PKG_VERSION }}
