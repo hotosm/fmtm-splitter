@@ -30,13 +30,13 @@ To install fmtm-splitter, you can use pip. Here are two options:
 Run a specific command:
 
 ```bash
-docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:0.1.0 fmtm-splitter
+docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest fmtm-splitter <flags>
 ```
 
 Run interactively (to use multiple commands):
 
 ```bash
-docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:0.1.0
+docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest
 ```
 
 > Note: the output directory should always be /data/... to persist data.
