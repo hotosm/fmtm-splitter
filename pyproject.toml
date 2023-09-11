@@ -7,8 +7,6 @@ authors = [
     {name = "Sam Woodcock", email = "sam.woodcock@hotosm.org"},
 ]
 dependencies = [
-    "codetiming>=1.4.0",
-    "epdb>=0.15.1",
     "geodex>=0.1.2",
     "geojson>=2.5.0",
     "progress>=1.6",
@@ -64,6 +62,8 @@ dev = [
 debug = [
     "debugpy>=1.6.7.post1",
     "ipdb>=0.13.13",
+    "epdb>=0.15.1",
+    "codetiming>=1.4.0",
 ]
 test = [
     "pytest>=7.4.0",
