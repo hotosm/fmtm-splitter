@@ -1,50 +1,66 @@
-# Copyright (c) 2022, 2023 Humanitarian OpenStreetMap Team
-# This file is part of FMTM.
-#
-#     FMTM is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 3 of the License, or
-#     (at your option) any later version.
-#
-#     FMTM is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with FMTM.  If not, see <https:#www.gnu.org/licenses/>.
-# 
+# gdb_history
+TAGS
+*~
+.deps
+.libs
+py-compile
+NEWS
+*__pycache__/
 
-# Distribution / packaging
-.Python
-src/backend/app/images
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-venv/
-src/backend/osm-fieldwork
+# output files
+*.osm
+*.txt
+*.xml
+*.geojson
+*.pbf
+*.xml
+*.pdf
+*.html
+*.mbtiles
+*.sqlitedb
 
-__pycache__
-credentials.txt
-odk2odm_venv/
+# Prerequisites
+*.d
 
-# PyCharm
-.idea/
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
 
-# VSCode
-.vscode
+# Precompiled Headers
+*.gch
+*.pch
 
-# test scripts and files
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# PDM
+pdm.toml
+.pdm-python
+__pypackages__
+
+# Python builds
+build
+dist
+
+# Docs
+site
+.cache

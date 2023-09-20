@@ -1,5 +1,7 @@
 # fmtm-splitter
 
+🕮 [Documentation](https://hotosm.github.io/fmtm-splitter/)
+
 This is a program to split polygons into tasks using a variety of
 algorythms. It is a class that can be used by other projects, but also
 a standalone program. It was originally developed for the
@@ -8,6 +10,36 @@ converted so it can be used by multiple projects.
 
 The class takes GeoJson Polygon as an input, and returns a GeoJson
 file Multipolygon of all the task boundaries.
+
+## Installation
+
+To install fmtm-splitter, you can use pip. Here are two options:
+
+- Directly from the main branch:
+  `pip install git+https://github.com/hotosm/fmtm-splitter.git`
+
+- Latest on PyPi:
+  `pip install fmtm-splitter`
+
+
+## Using the Container Image
+
+- fmtm-splitter scripts can be used via the pre-built container images.
+- These images come with all dependencies bundled, so are simple to run.
+
+Run a specific command:
+
+```bash
+docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest fmtm-splitter <flags>
+```
+
+Run interactively (to use multiple commands):
+
+```bash
+docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest
+```
+
+> Note: the output directory should always be /data/... to persist data.
 
 ## Split By Square
 
@@ -31,23 +63,23 @@ tasks.
 
 # The fmtm-splitter program
 
-	options:
-	-h, --help                       show this help message and exit
-	-v, --verbose                    verbose output
-	-o OUTFILE, --outfile OUTFILE    Output file from splitting
-	-m METERS, --meters METERS       Size in meters if using square splitting
-	-b BOUNDARY, --boundary BOUNDARY Polygon AOI
-	-s SOURCE, --source SOURCE       Source data, Geojson or PG:[dbname]
-	-c CUSTOM, --custom CUSTOM       Custom SQL query for database]
+    options:
+    -h, --help                       show this help message and exit
+    -v, --verbose                    verbose output
+    -o OUTFILE, --outfile OUTFILE    Output file from splitting
+    -m METERS, --meters METERS       Size in meters if using square splitting
+    -b BOUNDARY, --boundary BOUNDARY Polygon AOI
+    -s SOURCE, --source SOURCE       Source data, Geojson or PG:[dbname]
+    -c CUSTOM, --custom CUSTOM       Custom SQL query for database]
 
 This program splits a Polygon (the Area Of Interest)
 The data source for existing data can'be either the data extract used by the XLSForm, or a postgresql database.
 
     examples:
-        fmtm-splitter -b AOI 
+        fmtm-splitter -b AOI
         fmtm-splitter -v -b AOI -s data.geojson
         fmtm-splitter -v -b AOI -s PG:colorado
-        
+
         Where AOI is the boundary of the project as a polygon
         And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
         The task splitting defaults to squares, 50 meters across

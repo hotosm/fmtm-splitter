@@ -1,0 +1,35 @@
+name: pytest
+
+on:
+  # Run tests on all pushed branches
+  push:
+    branches:
+      - "*"
+    paths:
+      # Workflow is triggered only if code or tests change
+      - "fmtm_splitter"
+      - "tests"
+  # Run tests on PR, prior to merge to main & development.
+  pull_request:
+    branches:
+      - main
+  # Allow manual trigger (workflow_dispatch)
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Start CI Container
+        run: >
+          docker run -d --name fmtm_pytest
+          -v "$GITHUB_WORKSPACE/fmtm_splitter:/home/appuser/.local/lib/python3.10/site-packages/fmtm_splitter"
+          -v "$GITHUB_WORKSPACE/tests:/data/tests"
+          ghcr.io/hotosm/fmtm-splitter:ci
+          sleep infinity
+
+      - name: Run PyTest as appuser
+        run: docker exec fmtm_pytest gosu appuser pytest
