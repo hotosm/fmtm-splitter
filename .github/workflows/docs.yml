@@ -5,40 +5,36 @@ on:
     paths:
       - docs/**
       - fmtm_splitter/**
+      - mkdocs.yml
     branches: [main]
   # Allow manual trigger (workflow_dispatch)
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  publish_docs:
-    name: Publish Docs
+  get_cache_key:
     runs-on: ubuntu-latest
+    outputs:
+      cache_key: ${{ steps.set_cache_key.outputs.cache_key }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Set cache key
+        id: set_cache_key
+        run: echo "cache_key=docs-build-$(date --utc +'%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+  build_doxygen:
+    uses: hotosm/gh-workflows/.github/workflows/doxygen_build.yml@main
+    needs: [get_cache_key]
+    with:
+      cache_paths: |
+        docs/apidocs
+      cache_key: ${{ needs.get_cache_key.outputs.cache_key }}
 
-      - name: Read cache
-        uses: actions/cache@v3
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
-
-      - name: Install PDM
-        run: |
-          python3 -m pip install pdm
-
-      - name: Publish
-        run: |
-          pdm install -G docs --no-default
-          pdm run mkdocs gh-deploy --force
+  publish_docs:
+    uses: hotosm/gh-workflows/.github/workflows/mkdocs_build.yml@main
+    needs:
+      - get_cache_key
+      - build_doxygen
+    with:
+      image: ghcr.io/hotosm/fmtm-splitter:ci
+      cache_paths: |
+        docs/apidocs
+      cache_key: ${{ needs.get_cache_key.outputs.cache_key }}
