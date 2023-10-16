@@ -35,12 +35,15 @@ log = logging.getLogger(__name__)
 # Splitting algorythm choices
 choices = ("squares", "file", "custom")
 
+
 class FMTMSplitter(object):
     """A class to split polygons."""
-    def __init__(self,
-                 boundary: gpd.GeoDataFrame,
-                 algorythm: str = None,
-                 ):
+
+    def __init__(
+        self,
+        boundary: gpd.GeoDataFrame,
+        algorythm: str = None,
+    ):
         """This class splits a polygon into tasks using a variety of algorythms.
 
         Args:
@@ -50,7 +53,7 @@ class FMTMSplitter(object):
         Returns:
             instance (FMTMSplitter): An instance of this class
         """
-        self.size = 50          # 50 meters
+        self.size = 50  # 50 meters
         self.boundary = boundary
         self.algorythm = algorythm
         if algorythm == "squares":
@@ -60,9 +63,10 @@ class FMTMSplitter(object):
         elif algorythm == "custom":
             pass
 
-    def splitBySquare(self,
-                      meters: int,
-                      ):
+    def splitBySquare(
+        self,
+        meters: int,
+    ):
         """Split the polygon into squares.
 
         Args:
@@ -86,19 +90,14 @@ class FMTMSplitter(object):
         polygons = []
         for x in cols[:-1]:
             for y in rows[:-1]:
-                polygons.append(Polygon([(x,y), (x+wide, y), (x+wide, y+length), (x, y+length)]))
+                polygons.append(Polygon([(x, y), (x + wide, y), (x + wide, y + length), (x, y + length)]))
 
-                grid = gpd.GeoDataFrame({"geometry":polygons})
+                grid = gpd.GeoDataFrame({"geometry": polygons})
         clipped = gpd.clip(grid, gdf)
         data = geojson.loads(clipped.to_json())
         return data
 
-    def splitBySQL(self,
-                   aoi: gpd.GeoDataFrame,
-                   sql: str,
-                   dburl: dict,
-                   buildings: int
-                   ):
+    def splitBySQL(self, aoi: gpd.GeoDataFrame, sql: str, dburl: dict, buildings: int):
         """Split the polygon by features in the database using an SQL query.
 
         Args:
@@ -136,13 +135,16 @@ class FMTMSplitter(object):
         features = result[0][0]["features"]
 
         # clean up the temporary tables, we don't care about the result
-        dbcursor.execute("DROP TABLE buildings; DROP TABLE clusteredbuildings; DROP TABLE dumpedpoints; DROP TABLE lowfeaturecountpolygons; DROP TABLE voronois; DROP TABLE taskpolygons; DROP TABLE splitpolygons")
+        dbcursor.execute(
+            "DROP TABLE buildings; DROP TABLE clusteredbuildings; DROP TABLE dumpedpoints; DROP TABLE lowfeaturecountpolygons; DROP TABLE voronois; DROP TABLE taskpolygons; DROP TABLE splitpolygons"
+        )
         return features
 
-    def splitByFeature(self,
-                       aoi: gpd.GeoDataFrame,
-                       features: gpd.GeoDataFrame,
-                       ):
+    def splitByFeature(
+        self,
+        aoi: gpd.GeoDataFrame,
+        features: gpd.GeoDataFrame,
+    ):
         """Split the polygon by features in the database."""
         # gdf[(gdf['highway'] != 'turning_circle') | (gdf['highway'] != 'milestone')]
         # gdf[(gdf.geom_type != 'Point')]
@@ -150,6 +152,7 @@ class FMTMSplitter(object):
         gdf = gpd.GeoDataFrame.from_features(features)
         polygons = gpd.GeoSeries(polygonize(gdf.geometry))
         return polygons
+
 
 def main():
     """This main function lets this class be run standalone by a bash script."""
@@ -176,14 +179,14 @@ be either the data extract used by the XLSForm, or a postgresql database.
         fmtm-splitter -b AOI -b 20 -c custom.sql
         This will use a custom SQL query for splitting by map feature, and adjust task
         sizes based on the number of buildings.
-        """
+        """,
     )
     # the size of each task wheh using square splitting
     # the number of buildings in a task when using feature splitting
     buildings = 5
     # The default SQL query for feature splitting
     query = "fmtm_algorithm.sql"
-    parser.add_argument("-v", "--verbose",  action="store_true", help="verbose output")
+    parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
     # parser.add_argument("-a", "--algorythm", default='squares', choices=choices, help="Splitting Algorthm to use")
     parser.add_argument("-m", "--meters", help="Size in meters if using square splitting")
@@ -198,9 +201,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
         quit()
 
     # if verbose, dump to the terminal.
-    formatter = logging.Formatter(
-        "%(threadName)10s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(threadName)10s - %(name)s - %(levelname)s - %(message)s")
     level = logging.DEBUG
     if args.verbose:
         log.setLevel(level)
@@ -251,7 +252,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
 
         # log.info(f"Wrote {args.outfile}")
 
+
 if __name__ == "__main__":
     """This is just a hook so this file can be run standlone during development."""
     main()
-
