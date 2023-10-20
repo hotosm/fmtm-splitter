@@ -21,7 +21,6 @@ To install fmtm-splitter, you can use pip. Here are two options:
 - Latest on PyPi:
   `pip install fmtm-splitter`
 
-
 ## Using the Container Image
 
 - fmtm-splitter scripts can be used via the pre-built container images.
