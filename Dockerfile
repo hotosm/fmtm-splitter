@@ -18,12 +18,12 @@ ARG PYTHON_IMG_TAG=3.10
 
 
 FROM docker.io/python:${PYTHON_IMG_TAG}-slim-bookworm as base
+ARG COMMIT_REF
 ARG PYTHON_IMG_TAG
-ARG PKG_VERSION
 ARG MAINTAINER=admin@hotosm.org
 LABEL org.hotosm.fmtm-splitter.python-img-tag="${PYTHON_IMG_TAG}" \
-      org.hotosm.fmtm-splitter.maintainer="${MAINTAINER}" \
-      org.hotosm.fmtm-splitter.version="${PKG_VERSION}"
+      org.hotosm.fmtm-splitter.commit-ref="${COMMIT_REF}" \
+      org.hotosm.fmtm-splitter.maintainer="${MAINTAINER}"
 RUN set -ex \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install \
@@ -51,7 +51,6 @@ RUN pdm export --prod > requirements.txt \
 
 
 FROM base as build-wheel
-ARG PKG_VERSION
 WORKDIR /build
 COPY . .
 RUN pip install pdm==2.6.1 \
@@ -60,7 +59,6 @@ RUN pip install pdm==2.6.1 \
 
 
 FROM base as build
-ARG PKG_VERSION
 WORKDIR /opt/python
 RUN set -ex \
     && apt-get update \
@@ -69,18 +67,20 @@ RUN set -ex \
         "build-essential" \
         "gcc" \
         "libpcre3-dev" \
+        "libpq-dev" \
         "libspatialindex-dev" \
         "libproj-dev" \
         "libgeos-dev" \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=extract-deps --chown=appuser \
+COPY --from=extract-deps \
     /opt/python/requirements.txt /opt/python/
 RUN pip install --user --no-warn-script-location \
     --no-cache-dir -r ./requirements.txt
-COPY --from=build-wheel --chown=appuser \
-    "/build/dist/fmtm_splitter-$PKG_VERSION-py3-none-any.whl" .
-RUN pip install --user --no-warn-script-location \
-    --no-cache-dir "/opt/python/fmtm_splitter-$PKG_VERSION-py3-none-any.whl"
+COPY --from=build-wheel \
+    "/build/dist/*-py3-none-any.whl" .
+RUN whl_file=$(find . -name '*-py3-none-any.whl' -type f) \
+    && pip install --user --no-warn-script-location \
+    --no-cache-dir "${whl_file}"
 
 
 
@@ -101,6 +101,7 @@ RUN set -ex \
         "nano" \
         "curl" \
         "libpcre3" \
+        "postgresql-client" \
         "libglib2.0-0" \
         "libspatialindex-c6" \
         "libproj25" \
