@@ -2,8 +2,8 @@ name: Build
 
 on:
   push:
-    tags:
-      - "*"
+    # Build on each new tag
+    tags: ["*"]
   # Allow manual trigger
   workflow_dispatch:
 
