@@ -1,24 +1,17 @@
 name: Build
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "*"
   # Allow manual trigger
   workflow_dispatch:
 
 jobs:
-  extract-vars:
-    uses: hotosm/gh-workflows/.github/workflows/py_app_version.yml@main
-    with:
-      package_name: fmtm_splitter
-
-  backend-ci-build:
+  ci-build:
     uses: hotosm/gh-workflows/.github/workflows/image_build.yml@main
-    needs: [extract-vars]
     with:
       build_target: prod
-      image_tags: |
-        "ghcr.io/hotosm/fmtm-splitter:${{ needs.extract-vars.outputs.app_version }}"
-        "ghcr.io/hotosm/fmtm-splitter:latest"
+      image_name: "ghcr.io/${{ github.repository }}"
       build_args: |
-        PKG_VERSION=${{ needs.extract-vars.outputs.app_version }}
+        COMMIT_REF=${{ github.sha }}
