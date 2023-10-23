@@ -1,5 +1,6 @@
 # FMTM Splitter
 
+<!-- markdownlint-disable -->
 <p align="center">
   <img src="https://github.com/hotosm/fmtm/blob/main/images/hot_logo.png?raw=true" style="width: 200px;" alt="HOT"></a>
 </p>
@@ -32,6 +33,7 @@
       <img src="https://img.shields.io/github/license/hotosm/fmtm-splitter.svg" alt="License">
   </a>
 </p>
+<!-- markdownlint-disable -->
 
 ---
 
