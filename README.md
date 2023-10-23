@@ -1,6 +1,45 @@
-# fmtm-splitter
+# FMTM Splitter
 
-🕮 [Documentation](https://hotosm.github.io/fmtm-splitter/)
+<p align="center">
+  <img src="https://github.com/hotosm/fmtm/blob/main/images/hot_logo.png?raw=true" style="width: 200px;" alt="HOT"></a>
+</p>
+<p align="center">
+  <em>A utility for splitting a polygon onto multiple tasks.</em>
+</p>
+<p align="center">
+  <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build.yml" target="_blank">
+      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Build/badge.svg" alt="Build">
+  </a>
+  <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build-ci.yml" target="_blank">
+      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Build CI Img/badge.svg" alt="CI Build">
+  </a>
+  <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/docs.yml" target="_blank">
+      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Publish Docs/badge.svg" alt="Publish Docs">
+  </a>
+  <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/publish.yml" target="_blank">
+      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Publish to PyPi.org/badge.svg" alt="Publish">
+  </a>
+  <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/pytest.yml" target="_blank">
+      <img src="https://github.com/hotosm/fmtm-splitter/workflows/PyTest/badge.svg" alt="Test">
+  </a>
+  <a href="https://pypi.org/project/fmtm-splitter" target="_blank">
+      <img src="https://img.shields.io/pypi/v/fmtm-splitter?color=%2334D058&label=pypi%20package" alt="Package version">
+  </a>
+  <a href="https://pypistats.org/packages/fmtm-splitter" target="_blank">
+      <img src="https://img.shields.io/pypi/dm/fmtm-splitter.svg" alt="Downloads">
+  </a>
+  <a href="https://github.com/hotosm/fmtm-splitter/blob/main/LICENSE" target="_blank">
+      <img src="https://img.shields.io/github/license/hotosm/fmtm-splitter.svg" alt="License">
+  </a>
+</p>
+
+---
+
+🕮 **Documentation**: <a href="https://hotosm.github.io/fmtm-splitter/" target="_blank">https://hotosm.github.io/fmtm-splitter/</a>
+
+🖥️ **Source Code**: <a href="https://github.com/hotosm/fmtm-splitter" target="_blank">https://github.com/hotosm/fmtm-splitter</a>
+
+---
 
 This is a program to split polygons into tasks using a variety of
 algorythms. It is a class that can be used by other projects, but also
