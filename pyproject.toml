@@ -53,7 +53,7 @@ version_files = [
 version = {from = "fmtm_splitter/__version__.py"}
 [tool.pdm.build]
 includes = ["fmtm_splitter"]
-source-includes = ["tests", "LICENSE.md", "README.md"]
+source-includes = ["tests", "LICENSE", "README.md"]
 [tool.pdm.dev-dependencies]
 dev = [
     "black>=23.7.0",
