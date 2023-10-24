@@ -36,7 +36,7 @@
 
 ---
 
-🕮 **Documentation**: <a href="https://hotosm.github.io/fmtm-splitter/" target="_blank">https://hotosm.github.io/fmtm-splitter/</a>
+📖 **Documentation**: <a href="https://hotosm.github.io/fmtm-splitter/" target="_blank">https://hotosm.github.io/fmtm-splitter/</a>
 
 🖥️ **Source Code**: <a href="https://github.com/hotosm/fmtm-splitter" target="_blank">https://github.com/hotosm/fmtm-splitter</a>
 
