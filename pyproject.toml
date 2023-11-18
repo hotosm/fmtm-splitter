@@ -48,6 +48,7 @@ version_files = [
     "fmtm_splitter/__version__.py",
     "Makefile:VERSION",
 ]
+update_changelog_on_bump = true
 
 [tool.pdm]
 version = {from = "fmtm_splitter/__version__.py"}
