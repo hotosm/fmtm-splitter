@@ -54,7 +54,7 @@ update_changelog_on_bump = true
 version = {from = "fmtm_splitter/__version__.py"}
 [tool.pdm.build]
 includes = ["fmtm_splitter"]
-source-includes = ["tests", "LICENSE", "README.md"]
+source-includes = ["LICENSE.md", "README.md"]
 [tool.pdm.dev-dependencies]
 dev = [
     "black>=23.7.0",
