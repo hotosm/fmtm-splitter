@@ -380,24 +380,27 @@ be either the data extract used by the XLSForm, or a postgresql database.
         sizes based on the number of buildings.
         """,
     )
-    # the size of each task wheh using square splitting
-    # the number of buildings in a task when using feature splitting
-    buildings = 5
     # The default SQL query for feature splitting
     query = "fmtm_algorithm.sql"
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
-    # parser.add_argument("-a", "--algorythm", default='squares', choices=choices, help="Splitting Algorthm to use")
     parser.add_argument("-m", "--meters", help="Size in meters if using square splitting")
-    parser.add_argument("-number", "--number", default=buildings, help="Number of buildings in a task")
+    parser.add_argument("-number", "--number", default=5, help="Number of buildings in a task")
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
-    parser.add_argument("-c", "--custom", help="Custom SQL query for database]")
+    parser.add_argument("-c", "--custom", help="Custom SQL query for database")
+    parser.add_argument("-db", "--dburl", help="The database url string to custom sql")
 
     args = parser.parse_args()
     if len(argv) < 2:
         parser.print_help()
         quit()
+
+    # Parse AOI file or string
+    if not args.boundary:
+        err = "You need to specify an AOI! (file or geojson string)"
+        log.error(err)
+        raise ValueError(err)
 
     # if verbose, dump to the terminal.
     formatter = logging.Formatter("%(threadName)10s - %(name)s - %(levelname)s - %(message)s")
@@ -411,47 +414,38 @@ be either the data extract used by the XLSForm, or a postgresql database.
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
-    # log.debug("debug")
-    # log.info("info")
-    # log.info("warning")
-
-    # Read in the project AOI, which needs to be a GeoJson file
-    aoi = gpd.GeoDataFrame.from_file(args.boundary)
-    splitter = FMTMSplitter(aoi)
-
     if args.meters:
-        # split the AOI into squares
-        log.debug("Splitting the AOI by squares")
-        tasks = splitter.splitBySquare(args.meters)
-        jsonfile = open(args.outfile, "w")
-        dump(tasks, jsonfile)
-        log.debug(f"Wrote {args.outfile}")
+        split_by_square(
+            inputs.boundary,
+            meters=args.meters,
+            outfile=args.outfile,
+        )
     elif args.custom:
-        # split the AOI using features from an SQL query
-        log.debug("Splitting the AOI by SQL query")
-        sqlfile = "fmtm_algorithm.sql"
-        sqlfile = open(args.custom, "r")
-        query = sqlfile.read()
-        # dburl = "postgresql://myusername:mypassword@myhost:5432/mydatabase"
-        dburl = "postgresql://localhost:5432/colorado"
-        features = splitter.splitBySQL(aoi, query, dburl, args.number)
-        # features.to_file('splitBySQL.geojson', driver='GeoJSON')
-        collection = FeatureCollection(features)
-        out = open("splitBySQL.geojson", "w")
-        geojson.dump(collection, out)
-        log.info("Wrote splitBySQL.geojson")
+        split_by_sql(
+            inputs.boundary,
+            db=args.db,
+            sql_file=custom,
+            num_buildings=args.number,
+            outfile=args.outfile,
+        )
+    # Split by feature using geojson
     elif args.source and args.source[3:] != "PG:":
-        log.debug("Splitting the AOI using a data extract")
-        # split the AOI using features in a data file
-        indata = gpd.GeoDataFrame.from_file(args.source)
-        # indata.query('highway', inplace=True)
-        features = splitter.splitByFeature(aoi, indata)
-        features.to_file("splitByFeature.geojson", driver="GeoJSON")
-        log.info("Wrote splitByFeature.geojson")
-
-        # log.info(f"Wrote {args.outfile}")
+        split_by_features(
+            inputs.boundary,
+            geojson_input=args.source,
+            outfile=args.outfile,
+        )
+    # Split by feature using db
+    elif args.source and args.source[3:] == "PG:":
+        split_by_features(
+            inputs.boundary,
+            db_table=args.source[:3],
+            outfile=args.outfile,
+        )
 
 
 if __name__ == "__main__":
-    """This is just a hook so this file can be run standlone during development."""
+    """
+    This is just a hook so this file can be run standlone during development.
+    """
     main()
