@@ -174,6 +174,20 @@ class FMTMSplitter(object):
         self.split_features = geojson.loads(polygons.to_json())
         return self.split_features
 
+    def outputGeojson(
+        self,
+        filename: str = "output.geojson",
+    ) -> FeatureCollection:
+        """Output a geojson file from split features."""
+        if not self.split_features:
+            msg = "Feature splitting has not been executed. Do this first."
+            log.error(msg)
+            raise RuntimeError(msg)
+
+        jsonfile = open(filename, "w")
+        geojson.dump(self.split_features, jsonfile)
+        log.debug(f"Wrote split features to {filename}")
+
 
 
 def main():
