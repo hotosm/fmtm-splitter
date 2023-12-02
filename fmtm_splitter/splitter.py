@@ -154,16 +154,26 @@ class FMTMSplitter(object):
 
     def splitByFeature(
         self,
-        aoi: gpd.GeoDataFrame,
         features: gpd.GeoDataFrame,
-    ):
-        """Split the polygon by features in the database."""
+    ) -> FeatureCollection:
+        """Split the polygon by features in the database.
+
+        Args:
+            features(gpd.GeoSeries): GeoDataFrame of feautures to split by.
+
+        Returns:
+            data (FeatureCollection): A multipolygon of all the task boundaries.
+        """
         # gdf[(gdf['highway'] != 'turning_circle') | (gdf['highway'] != 'milestone')]
         # gdf[(gdf.geom_type != 'Point')]
         # gdf[['highway']]
-        gdf = gpd.GeoDataFrame.from_features(features)
+        log.debug("Splitting the AOI using a data extract")
+        gdf = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
         polygons = gpd.GeoSeries(polygonize(gdf.geometry))
-        return polygons
+
+        self.split_features = geojson.loads(polygons.to_json())
+        return self.split_features
+
 
 
 def main():
