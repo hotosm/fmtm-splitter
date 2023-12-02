@@ -21,7 +21,7 @@ import logging
 
 import geojson
 
-from fmtm_splitter.splitter import split_by_features, split_by_square
+from fmtm_splitter.splitter import split_by_features, split_by_sql, split_by_square
 
 log = logging.getLogger(__name__)
 
@@ -84,15 +84,16 @@ def test_split_by_features_geojson(aoi_json):
     assert len(features.get("features")) == 4
 
 
-# def test_split_by_sql_fmtm(aoi_json, extract_json):
-#     """Test divide by square from geojson file."""
-#     features = split_by_sql(
-#         aoi_json,
-#         "postgresql://fmtm:dummycipassword@db:5432/splitter",
-#         num_buildings=5,
-#         osm_extract=extract_json,
-#     )
-#     assert False
+def test_split_by_sql_fmtm(aoi_json, extract_json):
+    """Test divide by square from geojson file."""
+    features = split_by_sql(
+        aoi_json,
+        "postgresql://fmtm:dummycipassword@db:5432/splitter",
+        num_buildings=5,
+        osm_extract=extract_json,
+    )
+    print(features)
+    # TODO fix me once features returned
 
 
 # TODO add test for custom sql split
