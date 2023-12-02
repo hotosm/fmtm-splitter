@@ -45,7 +45,7 @@
 <!-- markdownlint-enable -->
 
 This is a program to split polygons into tasks using a variety of
-algorythms. It is a class that can be used by other projects, but also
+algorithms. It is a class that can be used by other projects, but also
 a standalone program. It was originally developed for the
 [FMTM](https://github.com/hotosm/fmtm/wiki) project, but then
 converted so it can be used by multiple projects.

@@ -1,8 +1,9 @@
 # fmtm-splitter
 
 This program splits a Polygon AOI into tasks using a varity of
-algorythms.
+algorithms.
 
+```bash
     options:
       -h, --help            show this help message and exit
       -v, --verbose         verbose output
@@ -17,22 +18,80 @@ algorythms.
       -s SOURCE, --source SOURCE
           Source data, Geojson or PG:[dbname]
       -c CUSTOM, --custom CUSTOM
-          Custom SQL query for database]
+          Custom SQL query for database
+      -db DATABASE, --dburl DATABASE
+          The database url string to custom sql
+```
 
 The data source for existing data can be either the data extract used
 by the XLSForm, or a postgresql database.
 
-# Examples
+## Examples
 
-    fmtm-splitter -b AOI
-    fmtm-splitter -v -b AOI -s data.geojson
-    fmtm-splitter -v -b AOI -s PG:colorado
+### Via Command Line
 
-    Where AOI is the boundary of the project as a polygon
-    And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
-    The task splitting defaults to squares, 50 meters across. If -m is used
-    then that also defaults to square splitting.
+```bash
+fmtm-splitter -b AOI
+fmtm-splitter -v -b AOI -s data.geojson
+fmtm-splitter -v -b AOI -s PG:colorado
+```
 
-    fmtm-splitter -b AOI -b 20 -c custom.sql
-    This will use a custom SQL query for splitting by map feature, and adjust task
-    sizes based on the number of buildings.
+> Where AOI is the boundary of the project as a polygon
+> And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
+> The task splitting defaults to squares, 50 meters across. If -m is used
+> then that also defaults to square splitting.
+
+### With Custom Query
+
+```bash
+fmtm-splitter -b AOI -b 20 -c custom.sql
+```
+
+> This will use a custom SQL query for splitting by map feature, and adjust task
+> sizes based on the number of buildings.
+
+### Via API
+
+#### Split By Square
+
+```python
+from fmtm_splitter.splitter import split_by_square
+
+features = split_by_square(
+    "path/to/your/file.geojson",
+    meters=100,
+)
+```
+
+#### Split By Features
+
+```python
+import geojson
+from fmtm_splitter.splitter import split_by_features
+
+aoi_json = geojson.load("/path/to/file.geojson")
+# Dump string to show that passing string json is possible too
+split_geom_json = geojson.dumps(geojson.load("/path/to/file.geojson"))
+
+features = split_by_features(
+    aoi_json,
+    split_geom_json,
+)
+```
+
+#### Split By SQL
+
+```python
+import geojson
+from fmtm_splitter.splitter import split_by_sql
+
+aoi_json = geojson.load("/path/to/file.geojson")
+extract_json = geojson.load("/path/to/file.geojson")
+
+features = split_by_sql(
+    aoi_json,
+    "postgresql://myuser:mypass@myhost:5432/mydb",
+    num_buildings=10,
+    osm_extract=extract_json,
+)
+```
