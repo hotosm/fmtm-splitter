@@ -38,7 +38,7 @@ WITH aoi AS (
 -- Combine the boundary of the AOI with the splitlines
 -- First extract the Area of Interest boundary as a line
 ,boundary AS (
-    SELECT ST_Boundary(geometry) AS geom
+    SELECT ST_Boundary(geom) AS geom
     FROM aoi
 )
 -- Then combine it with the splitlines
