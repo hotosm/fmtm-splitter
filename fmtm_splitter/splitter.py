@@ -35,6 +35,7 @@ from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
 
 from fmtm_splitter.db import Base, DbBuildings, DbOsmLines, get_engine, new_session
 
@@ -126,7 +127,7 @@ class FMTMSplitter(object):
     ) -> FeatureCollection:
         """Split the polygon by features in the database using an SQL query.
 
-        FIXME this requires some work to function with custom SQL
+        FIXME this requires some work to function with custom SQL.
 
         Args:
             sql (str): The SQL query to execute
@@ -196,57 +197,52 @@ class FMTMSplitter(object):
                     temp_session.add(db_feature)
             temp_session.commit()
 
-        # Use raw sql for view generation & remainder of script
-        log.debug("Creating db view with intersecting highways")
-        raw_conn = conn.raw_connection()
-        raw_conn.autocommit = True
-        dbcursor = raw_conn.cursor()
-        # Get aoi as geojson
-        aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
-        view = (
-            "DROP VIEW IF EXISTS lines_view;"
-            "CREATE VIEW lines_view AS SELECT "
-            "tags,geom FROM ways_line WHERE "
-            f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
-        )
-        # self.aoi.to_postgis('lines_view', conn, if_exists='replace')
-        dbcursor.execute(view)
+            # Use raw sql for view generation & remainder of script
+            log.debug("Creating db view with intersecting highways")
+            # Get aoi as geojson
+            aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
+            view = text(
+                "DROP VIEW IF EXISTS lines_view;"
+                "CREATE VIEW lines_view AS SELECT "
+                "tags,geom FROM ways_line WHERE "
+                f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
+            )
+            temp_session.execute(view)
 
-        # Only insert buildings param is specified
-        log.debug("Running task splitting algorithm")
-        if buildings:
-            query = sql.replace("{nbuildings}", str(buildings))
-        else:
-            query = sql
-        dbcursor.execute(query)
-        result = dbcursor.fetchall()
+            # Only insert buildings param is specified
+            log.debug("Running task splitting algorithm")
+            if buildings:
+                result = temp_session.execute(text(sql), params={"num_buildings": buildings}).fetchall()
+            else:
+                result = temp_session.execute(text(sql)).fetchall()
 
-        features = result[0][0]["features"]
-        if features:
-            log.info(f"Query returned {len(features)}")
-        else:
-            log.info("Query returned no features")
+            features = result[0][0]["features"]
+            if features:
+                log.info(f"Query returned {len(features)}")
+            else:
+                log.info("Query returned no features")
+            self.split_features = FeatureCollection(features)
 
-        # # clean up the temporary tables, we don't care about the result
-        # # optionally remove building, lines, and project_aoi tables
-        # drop_cmd = (
-        #     "DROP TABLE IF EXISTS buildings CASCADE; "
-        #     "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
-        #     "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
-        #     "DROP TABLE IF EXISTS lowfeaturecountpolygons CASCADE; "
-        #     "DROP TABLE IF EXISTS voronois CASCADE; "
-        #     "DROP TABLE IF EXISTS taskpolygons CASCADE; "
-        #     "DROP TABLE IF EXISTS splitpolygons CASCADE;"
-        # )
-        # if remove_tables:
-        #     drop_cmd += (
-        #         "DROP TABLE IF EXISTS project_aoi CASCADE; "
-        #         "DROP TABLE IF EXISTS ways_poly CASCADE; "
-        #         "DROP TABLE IF EXISTS ways_line CASCADE; "
-        #     )
-        # dbcursor.execute(drop_cmd)
+            # clean up the temporary tables, we don't care about the result
+            # optionally remove building, lines, and project_aoi tables
+            drop_cmd = (
+                "DROP TABLE IF EXISTS buildings CASCADE; "
+                "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
+                "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
+                "DROP TABLE IF EXISTS lowfeaturecountpolygons CASCADE; "
+                "DROP TABLE IF EXISTS voronois CASCADE; "
+                "DROP TABLE IF EXISTS taskpolygons CASCADE; "
+                "DROP TABLE IF EXISTS splitpolygons CASCADE;"
+            )
+            if remove_tables:
+                drop_cmd += (
+                    "DROP TABLE IF EXISTS project_aoi CASCADE; "
+                    "DROP TABLE IF EXISTS ways_poly CASCADE; "
+                    "DROP TABLE IF EXISTS ways_line CASCADE; "
+                )
+            log.debug(f"Running tables drop command: {drop_cmd}")
+            temp_session.execute(text(drop_cmd))
 
-        self.split_features = FeatureCollection(features)
         return self.split_features
 
     def splitByFeature(
