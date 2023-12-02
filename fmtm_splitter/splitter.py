@@ -23,14 +23,20 @@ import sys
 from pathlib import Path
 from sys import argv
 from typing import Optional, Union
+from uuid import uuid4
 
 import geojson
 import geopandas as gpd
 import numpy as np
+from geoalchemy2 import Geometry
+from geoalchemy2.shape import from_shape
 from geojson import FeatureCollection
 from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
-from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Session
+
+from fmtm_splitter.db import Base, DbBuildings, DbOsmLines, get_engine, new_session
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -110,47 +116,138 @@ class FMTMSplitter(object):
         self.split_features = geojson.loads(clipped.to_json())
         return self.split_features
 
+    def splitBySQL(
+        self,
+        sql: str,
+        db: Union[str, Session],
+        buildings: int,
+        osm_extract: Union[dict, FeatureCollection] = None,
+        remove_tables: bool = True,
+    ) -> FeatureCollection:
         """Split the polygon by features in the database using an SQL query.
 
+        FIXME this requires some work to function with custom SQL
+
         Args:
-            aoi (DataFrame): The project boundary
             sql (str): The SQL query to execute
-            dburl (str): The database URI
+            db(str, Session): The db url, format:
+                postgresql://myusername:mypassword@myhost:5432/mydatabase
+                OR an SQLAlchemy Session object that is reused.
+                Passing an Session object prevents requring additional
+                database sessions to be spawned.
             buildings (int): The number of buildings in each task
+            osm_extract (dict, FeatureCollection): an OSM extract geojson,
+                containing building polygons, or linestrings.
+            remove_tables (bool): Remove the generated database tables.
+                Defaults to True, but may be set to False to keep the
+                empty database tables after processing in complete.
+                This is for a marginal performance benefit if running
+                the splitting algorithm multiple times.
 
         Returns:
-            data (FeatureCollection): A multipolygon of all the task boundaries
+            data (FeatureCollection): A multipolygon of all the task boundaries.
         """
-        # Create a table with the project AOI
-        con = create_engine(dburl)
-        aoi.to_postgis("project_aoi", con, if_exists="replace")
+        # Validation
+        if buildings and not osm_extract:
+            msg = (
+                "To use the FMTM splitting algo, an OSM data extract must be passed "
+                "via param `osm_extract` as a geojson dict or FeatureCollection."
+            )
+            log.error(msg)
+            raise ValueError(msg)
+
+        # Get existing db engine, or create new one
+        conn = get_engine(db)
+
+        # Generate db tables if not exist
+        log.debug("Generating required temp tables")
+        Base.metadata.create_all(conn)
+
+        # Add aoi to project_aoi table
+        log.debug("Adding AOI to project_aoi table")
+        self.aoi.to_postgis(
+            "project_aoi",
+            conn,
+            if_exists="replace",
+            index=False,
+            dtype={
+                "id": UUID,
+                "geom": Geometry("GEOMETRY", srid=4326),
+                "tags": JSONB,
+            },
+        )
         # FIXME: geopandas chokes with this SQL query as it leaves a
         # a few features without a geometry. But we like it to create the
         # table the feature splitting needs to work without modification
-        # df = gpd.read_postgis(sql, con)
-        # return df
 
-        # geopandas can't handle views
-        # So instead do it the manual way
-        dbshell = psycopg2.connect(dburl)
-        dbshell.autocommit = True
-        dbcursor = dbshell.cursor()
-        text = geojson.loads(aoi.to_json())
-        view = f"DROP VIEW IF EXISTS lines_view;CREATE VIEW lines_view AS SELECT tags,geom FROM ways_line WHERE ST_CONTAINS(ST_GeomFromGeoJson('{text['features'][0]['geometry']}'), geom)"
-        # aoi.to_postgis('lines_view', con, if_exists='replace')
+        # Create a new session in engine connection
+        session = new_session(conn)
+        # Insert data extract into db
+        log.debug("Inserting data extract into db")
+        with session() as temp_session:
+            for feature in osm_extract["features"]:
+                feature_shape = shape(feature["geometry"])
+                wkb_element = from_shape(feature_shape, srid=4326)
+                if feature["properties"].get("tags").get("building") == "yes":
+                    db_feature = DbBuildings(project_id=self.id, geom=wkb_element, tags=feature["properties"])
+                    temp_session.add(db_feature)
+                elif "highway" in feature["properties"]:
+                    db_feature = DbOsmLines(project_id=self.id, geom=wkb_element, tags=feature["properties"])
+                    temp_session.add(db_feature)
+            temp_session.commit()
+
+        # Use raw sql for view generation & remainder of script
+        log.debug("Creating db view with intersecting highways")
+        raw_conn = conn.raw_connection()
+        raw_conn.autocommit = True
+        dbcursor = raw_conn.cursor()
+        # Get aoi as geojson
+        aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
+        view = (
+            "DROP VIEW IF EXISTS lines_view;"
+            "CREATE VIEW lines_view AS SELECT "
+            "tags,geom FROM ways_line WHERE "
+            f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
+        )
+        # self.aoi.to_postgis('lines_view', conn, if_exists='replace')
         dbcursor.execute(view)
 
-        query = sql.replace("{nbuildings}", str(buildings))
+        # Only insert buildings param is specified
+        log.debug("Running task splitting algorithm")
+        if buildings:
+            query = sql.replace("{nbuildings}", str(buildings))
+        else:
+            query = sql
         dbcursor.execute(query)
         result = dbcursor.fetchall()
-        log.info(f"Query returned {len(result[0][0]['features'])}")
-        features = result[0][0]["features"]
 
-        # clean up the temporary tables, we don't care about the result
-        dbcursor.execute(
-            "DROP TABLE buildings; DROP TABLE clusteredbuildings; DROP TABLE dumpedpoints; DROP TABLE lowfeaturecountpolygons; DROP TABLE voronois; DROP TABLE taskpolygons; DROP TABLE splitpolygons"
-        )
-        return features
+        features = result[0][0]["features"]
+        if features:
+            log.info(f"Query returned {len(features)}")
+        else:
+            log.info("Query returned no features")
+
+        # # clean up the temporary tables, we don't care about the result
+        # # optionally remove building, lines, and project_aoi tables
+        # drop_cmd = (
+        #     "DROP TABLE IF EXISTS buildings CASCADE; "
+        #     "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
+        #     "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
+        #     "DROP TABLE IF EXISTS lowfeaturecountpolygons CASCADE; "
+        #     "DROP TABLE IF EXISTS voronois CASCADE; "
+        #     "DROP TABLE IF EXISTS taskpolygons CASCADE; "
+        #     "DROP TABLE IF EXISTS splitpolygons CASCADE;"
+        # )
+        # if remove_tables:
+        #     drop_cmd += (
+        #         "DROP TABLE IF EXISTS project_aoi CASCADE; "
+        #         "DROP TABLE IF EXISTS ways_poly CASCADE; "
+        #         "DROP TABLE IF EXISTS ways_line CASCADE; "
+        #     )
+        # dbcursor.execute(drop_cmd)
+
+        self.split_features = FeatureCollection(features)
+        return self.split_features
 
     def splitByFeature(
         self,
@@ -324,7 +421,7 @@ def split_by_features(
 
     # Features from database
     if db_table:
-        data = f"PG:{db_table}"
+        # data = f"PG:{db_table}"
         # TODO get input_features from db
         raise NotImplementedError("Splitting from db featurs it not implemented yet.")
 
@@ -381,7 +478,6 @@ be either the data extract used by the XLSForm, or a postgresql database.
         """,
     )
     # The default SQL query for feature splitting
-    query = "fmtm_algorithm.sql"
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
     parser.add_argument("-m", "--meters", help="Size in meters if using square splitting")
@@ -416,29 +512,29 @@ be either the data extract used by the XLSForm, or a postgresql database.
 
     if args.meters:
         split_by_square(
-            inputs.boundary,
+            args.boundary,
             meters=args.meters,
             outfile=args.outfile,
         )
     elif args.custom:
         split_by_sql(
-            inputs.boundary,
+            args.boundary,
             db=args.db,
-            sql_file=custom,
+            sql_file=args.custom,
             num_buildings=args.number,
             outfile=args.outfile,
         )
     # Split by feature using geojson
     elif args.source and args.source[3:] != "PG:":
         split_by_features(
-            inputs.boundary,
+            args.boundary,
             geojson_input=args.source,
             outfile=args.outfile,
         )
     # Split by feature using db
     elif args.source and args.source[3:] == "PG:":
         split_by_features(
-            inputs.boundary,
+            args.boundary,
             db_table=args.source[:3],
             outfile=args.outfile,
         )
