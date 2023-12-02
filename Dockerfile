@@ -119,8 +119,8 @@ FROM runtime as ci
 ARG PYTHON_IMG_TAG
 COPY --from=extract-deps \
     /opt/python/requirements-ci.txt /opt/python/
-RUN mv /root/.local/bin/* /usr/local/bin/ \
-    && mv /root/.local/lib/python${PYTHON_IMG_TAG}/site-packages/* \
+RUN cp -r /root/.local/bin/* /usr/local/bin/ \
+    && cp -r /root/.local/lib/python${PYTHON_IMG_TAG}/site-packages/* \
     /usr/local/lib/python${PYTHON_IMG_TAG}/site-packages/ \
     && set -ex \
     && apt-get update \
