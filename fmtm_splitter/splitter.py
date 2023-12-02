@@ -15,25 +15,25 @@
 #     You should have received a copy of the GNU General Public License
 #     along with FMTM-Splitter.  If not, see <https:#www.gnu.org/licenses/>.
 #
+"""Class and helper methods for task splitting."""
 
 import argparse
 import logging
 import sys
+from pathlib import Path
 from sys import argv
+from typing import Optional, Union
 
 import geojson
 import geopandas as gpd
 import numpy as np
-import psycopg2
-from geojson import FeatureCollection, Polygon, dump
-from shapely.geometry import Polygon
+from geojson import FeatureCollection
+from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
 from sqlalchemy import create_engine
 
 # Instantiate logger
 log = logging.getLogger(__name__)
-# Splitting algorythm choices
-choices = ("squares", "file", "custom")
 
 
 class FMTMSplitter(object):
@@ -41,27 +41,40 @@ class FMTMSplitter(object):
 
     def __init__(
         self,
-        boundary: gpd.GeoDataFrame,
-        algorythm: str = None,
+        aoi: Union[str, FeatureCollection],
     ):
-        """This class splits a polygon into tasks using a variety of algorythms.
+        """This class splits a polygon into tasks using a variety of algorithms.
 
         Args:
-            boundary (FeatureCollection): The boundary polygon
-            algorythm (str): The splitting algorythm to use
+            aoi (str, FeatureCollection): Input AOI, either a file path,
+                or GeoJSON string.
 
         Returns:
             instance (FMTMSplitter): An instance of this class
         """
-        self.size = 50  # 50 meters
-        self.boundary = boundary
-        self.algorythm = algorythm
-        if algorythm == "squares":
-            self.splitBySquare(self.size)
-        elif algorythm == "osm":
-            pass
-        elif algorythm == "custom":
-            pass
+        # Parse AOI
+        if isinstance(aoi, str) and Path(aoi).is_file():
+            log.info(f"Parsing AOI from file {aoi}")
+            self.aoi = gpd.GeoDataFrame.from_file(aoi, crs="EPSG:4326")
+        elif isinstance(aoi, str):
+            log.info(f"Parsing AOI GeoJSON from string {aoi}")
+            self.aoi = gpd.GeoDataFrame(geojson.loads(aoi), crs="EPSG:4326")
+        elif isinstance(aoi, FeatureCollection):
+            self.aoi = gpd.GeoDataFrame(aoi.get("features"), crs="EPSG:4326")
+        else:
+            err = f"The specified AOI is not valid (must be geojson or str): {aoi}"
+            log.error(err)
+            raise ValueError(err)
+
+        # Rename fields to match schema & set id field
+        self.id = uuid4()
+        self.aoi["id"] = str(self.id)
+        self.aoi.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
+        self.aoi.drop(columns=["type"], inplace=True)
+        self.aoi.set_geometry("geom", inplace=True)
+
+        # Init split features
+        self.split_features = None
 
     def splitBySquare(
         self,
