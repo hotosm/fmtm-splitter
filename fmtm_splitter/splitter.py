@@ -79,18 +79,18 @@ class FMTMSplitter(object):
     def splitBySquare(
         self,
         meters: int,
-    ):
+    ) -> FeatureCollection:
         """Split the polygon into squares.
 
         Args:
-            meters (int):  The size of each task square in meters
+            meters (int):  The size of each task square in meters.
 
         Returns:
-            data (FeatureCollection): A multipolygon of all the task boundaries
+            data (FeatureCollection): A multipolygon of all the task boundaries.
         """
-        gdf = gpd.GeoDataFrame.from_features(self.boundary)
+        log.debug("Splitting the AOI by squares")
 
-        xmin, ymin, xmax, ymax = gdf.total_bounds
+        xmin, ymin, xmax, ymax = self.aoi.total_bounds
 
         # 1 meters is this factor in degrees
         meter = 0.0000114
@@ -104,13 +104,12 @@ class FMTMSplitter(object):
         for x in cols[:-1]:
             for y in rows[:-1]:
                 polygons.append(Polygon([(x, y), (x + wide, y), (x + wide, y + length), (x, y + length)]))
+                grid = gpd.GeoDataFrame({"geometry": polygons}, crs="EPSG:4326")
 
-                grid = gpd.GeoDataFrame({"geometry": polygons})
-        clipped = gpd.clip(grid, gdf)
-        data = geojson.loads(clipped.to_json())
-        return data
+        clipped = gpd.clip(grid, self.aoi)
+        self.split_features = geojson.loads(clipped.to_json())
+        return self.split_features
 
-    def splitBySQL(self, aoi: gpd.GeoDataFrame, sql: str, dburl: dict, buildings: int):
         """Split the polygon by features in the database using an SQL query.
 
         Args:
