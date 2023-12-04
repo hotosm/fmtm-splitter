@@ -187,13 +187,19 @@ class FMTMSplitter(object):
         log.debug("Inserting data extract into db")
         with session() as temp_session:
             for feature in osm_extract["features"]:
-                feature_shape = shape(feature["geometry"])
-                wkb_element = from_shape(feature_shape, srid=4326)
-                if feature["properties"].get("tags").get("building") == "yes":
-                    db_feature = DbBuildings(project_id=self.id, geom=wkb_element, tags=feature["properties"])
+                wkb_element = from_shape(shape(feature["geometry"]), srid=4326)
+                properties = feature["properties"]
+                tags = properties.get("tags", {})
+                osm_id = properties.get("osm_id")
+                # Common attributes for db tables
+                common_args = dict(project_id=self.id, osm_id=osm_id, geom=wkb_element, tags=tags)
+                # Insert building polygons
+                if tags.get("building") == "yes":
+                    db_feature = DbBuildings(**common_args)
                     temp_session.add(db_feature)
-                elif "highway" in feature["properties"].get("tags"):
-                    db_feature = DbOsmLines(project_id=self.id, geom=wkb_element, tags=feature["properties"])
+                # Insert highway/waterway/railway polylines
+                elif any(key in tags for key in ["highway", "waterway", "railway"]):
+                    db_feature = DbOsmLines(**common_args)
                     temp_session.add(db_feature)
             temp_session.commit()
 
