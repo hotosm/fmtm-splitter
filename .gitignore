@@ -12,6 +12,7 @@ NEWS
 *.txt
 *.xml
 *.geojson
+!/tests/testdata/*.geojson
 *.pbf
 *.xml
 *.pdf
