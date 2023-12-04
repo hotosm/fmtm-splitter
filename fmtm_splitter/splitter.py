@@ -77,13 +77,13 @@ class FMTMSplitter(object):
         self.id = uuid4()
         self.aoi["id"] = str(self.id)
         self.aoi.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
-        self.aoi.drop(columns=["type"], inplace=True)
+        self.aoi.drop(columns=["type"], inplace=True, errors="ignore")
         self.aoi.set_geometry("geom", inplace=True)
 
         # Init split features
         self.split_features = None
 
-    def splitBySquare(
+    def splitBySquare(  # noqa: N802
         self,
         meters: int,
     ) -> FeatureCollection:
@@ -117,7 +117,7 @@ class FMTMSplitter(object):
         self.split_features = geojson.loads(clipped.to_json())
         return self.split_features
 
-    def splitBySQL(
+    def splitBySQL(  # noqa: N802
         self,
         sql: str,
         db: Union[str, Session],
@@ -245,7 +245,7 @@ class FMTMSplitter(object):
 
         return self.split_features
 
-    def splitByFeature(
+    def splitByFeature(  # noqa: N802
         self,
         features: gpd.GeoDataFrame,
     ) -> FeatureCollection:
@@ -267,7 +267,7 @@ class FMTMSplitter(object):
         self.split_features = geojson.loads(polygons.to_json())
         return self.split_features
 
-    def outputGeojson(
+    def outputGeojson(  # noqa: N802
         self,
         filename: str = "output.geojson",
     ) -> FeatureCollection:
