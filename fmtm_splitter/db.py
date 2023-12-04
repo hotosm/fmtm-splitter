@@ -93,5 +93,6 @@ class DbOsmLines(Base):
 
     id = Column(Integer, primary_key=True)
     project_id = Column(String)
+    osm_id = Column(String)
     geom = Column(Geometry(geometry_type="GEOMETRY", srid=4326))
     tags = Column(JSONB)
