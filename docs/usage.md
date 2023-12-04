@@ -41,14 +41,22 @@ fmtm-splitter -v -b AOI -s PG:colorado
 > The task splitting defaults to squares, 50 meters across. If -m is used
 > then that also defaults to square splitting.
 
-### With Custom Query
+#### With Custom Query
 
 ```bash
-fmtm-splitter -b AOI -b 20 -c custom.sql
+fmtm-splitter -b AOI -c custom.sql
 ```
 
 > This will use a custom SQL query for splitting by map feature, and adjust task
 > sizes based on the number of buildings.
+
+#### Using FMTM Splitting Algorithm
+
+```bash
+fmtm-splitter -b "/path/to/aoi.geojson" \
+    -db "postgresql://myuser:mypass@myhost:5432/mydb" \
+    -number 10 -e "/path/to/extract.geojson"
+```
 
 ### Via API
 
