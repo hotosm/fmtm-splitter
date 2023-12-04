@@ -23,7 +23,7 @@ networks:
 
 services:
   splitter:
-    image: "ghcr.io/hotosm/fmtm-splitter:${TAG_OVERRIDE:-ci}"
+    image: "ghcr.io/hotosm/fmtm-splitter:ci"
     build:
       target: ci
     container_name: fmtm-splitter
@@ -41,7 +41,7 @@ services:
     command: "pytest"
 
   db:
-    image: "postgis/postgis:${POSTGIS_TAG:-14-3.4-alpine}"
+    image: "postgis/postgis:14-3.4-alpine"
     container_name: fmtm-splitter-db
     environment:
       - POSTGRES_USER=fmtm
