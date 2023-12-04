@@ -46,7 +46,7 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def aoi_json():
     """Dummy AOI GeoJSON."""
-    path = Path(__file__).parent / "testdata" / "annecy.geojson"
+    path = Path(__file__).parent / "testdata" / "kathmandu.geojson"
     jsonfile = open(path, "r")
     return geojson.load(jsonfile)
 
@@ -66,7 +66,7 @@ def extract_json():
     #         }
     #     }
     # }
-    # path = Path(__file__).parent / "testdata" / "annecy.geojson"
+    # path = Path(__file__).parent / "testdata" / "kathmandu.geojson"
     # jsonfile = open(path, "r")
     # json_boundary = geojson.load(jsonfile)
     # query["geometry"] = json_boundary.get("features", None)[0].get("geometry")
@@ -80,7 +80,7 @@ def extract_json():
     # print(result)
     # task_id = result.json()["task_id"]
     # print(task_id)
-    path = Path(__file__).parent / "testdata" / "annecy_extract.geojson"
+    path = Path(__file__).parent / "testdata" / "kathmandu_extract.geojson"
     jsonfile = open(path, "r")
     return geojson.load(jsonfile)
 

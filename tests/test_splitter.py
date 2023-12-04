@@ -32,12 +32,12 @@ def test_divide_by_square_with_str(aoi_json):
         geojson.dumps(aoi_json.get("features")),
         meters=50,
     )
-    assert len(features.get("features")) == 24
+    assert len(features.get("features")) == 54
     features = split_by_square(
-        "tests/testdata/annecy.geojson",
+        "tests/testdata/kathmandu.geojson",
         meters=100,
     )
-    assert len(features.get("features")) == 6
+    assert len(features.get("features")) == 15
 
 
 def test_divide_by_square_with_obj(aoi_json):
@@ -46,12 +46,12 @@ def test_divide_by_square_with_obj(aoi_json):
         aoi_json,
         meters=50,
     )
-    assert len(features.get("features")) == 24
+    assert len(features.get("features")) == 54
     features = split_by_square(
-        "tests/testdata/annecy.geojson",
+        "tests/testdata/kathmandu.geojson",
         meters=100,
     )
-    assert len(features.get("features")) == 6
+    assert len(features.get("features")) == 15
 
 
 def test_divide_by_square_with_files():
@@ -60,26 +60,26 @@ def test_divide_by_square_with_files():
     Also write output to file.
     """
     features = split_by_square(
-        "tests/testdata/annecy.geojson",
+        "tests/testdata/kathmandu.geojson",
         meters=50,
         outfile="output.geojson",
     )
-    assert len(features.get("features")) == 24
+    assert len(features.get("features")) == 54
     features = split_by_square(
-        "tests/testdata/annecy.geojson",
+        "tests/testdata/kathmandu.geojson",
         meters=100,
     )
-    assert len(features.get("features")) == 6
+    assert len(features.get("features")) == 15
 
 
 def test_split_by_features_geojson(aoi_json):
     """Test divide by square from geojson file.
 
-    annecy_split.json contains 4 polygons inside the annecy.json area.
+    kathmandu_split.json contains 4 polygons inside the kathmandu.json area.
     """
     features = split_by_features(
         aoi_json,
-        geojson_input="tests/testdata/annecy_split.geojson",
+        geojson_input="tests/testdata/kathmandu_split.geojson",
     )
     assert len(features.get("features")) == 4
 
