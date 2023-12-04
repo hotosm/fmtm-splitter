@@ -53,7 +53,7 @@ services:
       - net
     restart: "unless-stopped"
     healthcheck:
-      test: pg_isready -U ${FMTM_DB_USER:-fmtm} -d ${FMTM_DB_NAME:-fmtm}
+      test: pg_isready -U ${FMTM_DB_USER:-fmtm} -d ${FMTM_DB_NAME:-splitter}
       start_period: 5s
       interval: 10s
       timeout: 5s
