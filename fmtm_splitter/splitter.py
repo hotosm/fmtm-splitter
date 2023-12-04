@@ -192,7 +192,7 @@ class FMTMSplitter(object):
                 if feature["properties"].get("tags").get("building") == "yes":
                     db_feature = DbBuildings(project_id=self.id, geom=wkb_element, tags=feature["properties"])
                     temp_session.add(db_feature)
-                elif "highway" in feature["properties"]:
+                elif "highway" in feature["properties"].get("tags"):
                     db_feature = DbOsmLines(project_id=self.id, geom=wkb_element, tags=feature["properties"])
                     temp_session.add(db_feature)
             temp_session.commit()
