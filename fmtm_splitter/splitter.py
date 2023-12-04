@@ -21,7 +21,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from sys import argv
 from typing import Optional, Union
 from uuid import uuid4
 
@@ -329,7 +328,7 @@ def split_by_sql(
     db: Union[str, Session],
     sql_file: str = None,
     num_buildings: str = None,
-    osm_extract: Union[dict, FeatureCollection] = None,
+    osm_extract: Union[str, FeatureCollection] = None,
     outfile: str = None,
 ) -> FeatureCollection:
     """Split an AOI with a custom SQL query or default FMTM query.
@@ -354,7 +353,7 @@ def split_by_sql(
         sql_file(str): Path to custom splitting algorithm.
         num_buildings(str): The number of buildings to optimise the FMTM
             splitting algorithm with (approx buildings per generated feature).
-        osm_extract (dict, FeatureCollection): an OSM extract geojson,
+        osm_extract (str, FeatureCollection): an OSM extract geojson,
             containing building polygons, or linestrings.
         outfile(str): Output to a GeoJSON file on disk.
 
@@ -372,10 +371,14 @@ def split_by_sql(
     if num_buildings:
         sql_file = Path(__file__).parent / "fmtm_algorithm.sql"
 
-    sql = open(sql_file, "r")
-    query = sql.read()
+    with open(sql_file, "r") as sql:
+        query = sql.read()
 
-    features = splitter.splitBySQL(query, db, num_buildings, osm_extract=osm_extract)
+    # Extracts and parse extract geojson
+    if osm_extract:
+        extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
+
+    features = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
     if not features:
         msg = "Failed to generate split features."
         log.error(msg)
@@ -452,10 +455,10 @@ def split_by_features(
     return features
 
 
-def main():
+def main(args_list: list[str] | None = None):
     """This main function lets this class be run standalone by a bash script."""
     parser = argparse.ArgumentParser(
-        prog="FMTMSplitter.py",
+        prog="splitter.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="This program splits a Polygon AOI into tasks",
         epilog="""
@@ -482,15 +485,17 @@ be either the data extract used by the XLSForm, or a postgresql database.
     # The default SQL query for feature splitting
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
-    parser.add_argument("-m", "--meters", help="Size in meters if using square splitting")
-    parser.add_argument("-number", "--number", default=5, help="Number of buildings in a task")
+    parser.add_argument("-m", "--meters", nargs="?", const=50, help="Size in meters if using square splitting")
+    parser.add_argument("-number", "--number", nargs="?", const=5, help="Number of buildings in a task")
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
     parser.add_argument("-c", "--custom", help="Custom SQL query for database")
     parser.add_argument("-db", "--dburl", help="The database url string to custom sql")
+    parser.add_argument("-e", "--extract", help="The OSM data extract for fmtm splitter")
 
-    args = parser.parse_args()
-    if len(argv) < 2:
+    # Accept command line args, or func params
+    args = parser.parse_args(args_list)
+    if not any(vars(args).values()):
         parser.print_help()
         quit()
 
@@ -518,12 +523,13 @@ be either the data extract used by the XLSForm, or a postgresql database.
             meters=args.meters,
             outfile=args.outfile,
         )
-    elif args.custom:
+    elif args.number:
         split_by_sql(
             args.boundary,
             db=args.dburl,
             sql_file=args.custom,
             num_buildings=args.number,
+            osm_extract=args.extract,
             outfile=args.outfile,
         )
     # Split by feature using geojson
