@@ -25,8 +25,14 @@ repos:
     rev: v3.1.0
     hooks:
       - id: prettier
-        args: [--ignore-unknown, --no-error-on-unmatched-pattern, "!chart/**"]
-
+        args:
+          [
+            --ignore-unknown,
+            --no-error-on-unmatched-pattern,
+            "!chart/**",
+            "!CHANGELOG.md",
+            "!tests/testdata/*",
+          ]
   # Lint: Markdown
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.37.0
