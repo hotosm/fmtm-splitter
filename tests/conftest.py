@@ -47,8 +47,8 @@ def pytest_configure(config):
 def aoi_json():
     """Dummy AOI GeoJSON."""
     path = Path(__file__).parent / "testdata" / "kathmandu.geojson"
-    jsonfile = open(path, "r")
-    return geojson.load(jsonfile)
+    with open(path, "r") as jsonfile:
+        return geojson.load(jsonfile)
 
 
 @pytest.fixture(scope="session")
@@ -81,8 +81,16 @@ def extract_json():
     # task_id = result.json()["task_id"]
     # print(task_id)
     path = Path(__file__).parent / "testdata" / "kathmandu_extract.geojson"
-    jsonfile = open(path, "r")
-    return geojson.load(jsonfile)
+    with open(path, "r") as jsonfile:
+        return geojson.load(jsonfile)
+
+
+@pytest.fixture(scope="session")
+def output_json():
+    """Processed JSON using FMTM Algo on dummy AOI."""
+    path = Path(__file__).parent / "testdata" / "kathmandu_processed.geojson"
+    with open(path, "r") as jsonfile:
+        return geojson.load(jsonfile)
 
 
 # @pytest.fixture(scope="session")

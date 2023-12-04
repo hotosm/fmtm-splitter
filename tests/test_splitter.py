@@ -18,15 +18,17 @@
 """Test task splitting algorithms."""
 
 import logging
+from pathlib import Path
+from uuid import uuid4
 
 import geojson
 
-from fmtm_splitter.splitter import split_by_features, split_by_sql, split_by_square
+from fmtm_splitter.splitter import main, split_by_features, split_by_sql, split_by_square
 
 log = logging.getLogger(__name__)
 
 
-def test_divide_by_square_with_str(aoi_json):
+def test_split_by_square_with_str(aoi_json):
     """Test divide by square from geojson obj."""
     features = split_by_square(
         geojson.dumps(aoi_json.get("features")),
@@ -40,7 +42,7 @@ def test_divide_by_square_with_str(aoi_json):
     assert len(features.get("features")) == 15
 
 
-def test_divide_by_square_with_obj(aoi_json):
+def test_split_by_square_with_obj(aoi_json):
     """Test divide by square from geojson obj."""
     features = split_by_square(
         aoi_json,
@@ -54,22 +56,22 @@ def test_divide_by_square_with_obj(aoi_json):
     assert len(features.get("features")) == 15
 
 
-def test_divide_by_square_with_files():
+def test_split_by_square_with_files():
     """Test divide by square from geojson file.
 
     Also write output to file.
     """
+    outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
     features = split_by_square(
         "tests/testdata/kathmandu.geojson",
         meters=50,
-        outfile="output.geojson",
+        outfile=str(outfile),
     )
     assert len(features.get("features")) == 54
-    features = split_by_square(
-        "tests/testdata/kathmandu.geojson",
-        meters=100,
-    )
-    assert len(features.get("features")) == 15
+    # Also check output file
+    with open(outfile, "r") as jsonfile:
+        output_geojson = geojson.load(jsonfile)
+    assert len(output_geojson.get("features")) == 54
 
 
 def test_split_by_features_geojson(aoi_json):
@@ -84,7 +86,7 @@ def test_split_by_features_geojson(aoi_json):
     assert len(features.get("features")) == 4
 
 
-def test_split_by_sql_fmtm(aoi_json, extract_json):
+def test_split_by_sql_fmtm(aoi_json, extract_json, output_json):
     """Test divide by square from geojson file."""
     features = split_by_sql(
         aoi_json,
@@ -92,8 +94,78 @@ def test_split_by_sql_fmtm(aoi_json, extract_json):
         num_buildings=5,
         osm_extract=extract_json,
     )
-    print(features)
-    # TODO fix me once features returned
+    assert len(features.get("features")) == 122
+    assert sorted(features) == sorted(output_json)
 
 
-# TODO add test for custom sql split
+def test_cli_help(capsys):
+    """Check help text displays on CLI."""
+    try:
+        main(["--help"])
+    except SystemExit:
+        pass
+    captured = capsys.readouterr().out
+    assert "This program splits a Polygon AOI into tasks" in captured
+
+
+def test_split_by_square_cli():
+    """Test split by square works via CLI."""
+    infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
+
+    try:
+        main(["--boundary", str(infile), "--meters", "100", "--outfile", str(outfile)])
+    except SystemExit:
+        pass
+
+    with open(outfile, "r") as jsonfile:
+        output_geojson = geojson.load(jsonfile)
+
+    assert len(output_geojson.get("features")) == 15
+
+
+def test_split_by_features_cli():
+    """Test split by features works via CLI."""
+    infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
+    split_geojson = Path(__file__).parent / "testdata" / "kathmandu_split.geojson"
+
+    try:
+        main(["--boundary", str(infile), "--source", str(split_geojson), "--outfile", str(outfile)])
+    except SystemExit:
+        pass
+
+    with open(outfile, "r") as jsonfile:
+        output_geojson = geojson.load(jsonfile)
+
+    assert len(output_geojson.get("features")) == 4
+
+
+def test_split_by_sql_cli():
+    """Test split by sql works via CLI."""
+    infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
+    extract_geojson = Path(__file__).parent / "testdata" / "kathmandu_extract.geojson"
+
+    try:
+        main(
+            [
+                "--boundary",
+                str(infile),
+                "--dburl",
+                "postgresql://fmtm:dummycipassword@db:5432/splitter",
+                "--number",
+                "10",
+                "--extract",
+                str(extract_geojson),
+                "--outfile",
+                str(outfile),
+            ]
+        )
+    except SystemExit:
+        pass
+
+    with open(outfile, "r") as jsonfile:
+        output_geojson = geojson.load(jsonfile)
+
+    assert len(output_geojson.get("features")) == 62
