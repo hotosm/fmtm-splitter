@@ -515,7 +515,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
     elif args.custom:
         split_by_sql(
             args.boundary,
-            db=args.db,
+            db=args.dburl,
             sql_file=args.custom,
             num_buildings=args.number,
             outfile=args.outfile,
