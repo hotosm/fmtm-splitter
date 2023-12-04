@@ -123,7 +123,6 @@ class FMTMSplitter(object):
         db: Union[str, Session],
         buildings: int,
         osm_extract: Union[dict, FeatureCollection] = None,
-        remove_tables: bool = True,
     ) -> FeatureCollection:
         """Split the polygon by features in the database using an SQL query.
 
@@ -139,11 +138,6 @@ class FMTMSplitter(object):
             buildings (int): The number of buildings in each task
             osm_extract (dict, FeatureCollection): an OSM extract geojson,
                 containing building polygons, or linestrings.
-            remove_tables (bool): Remove the generated database tables.
-                Defaults to True, but may be set to False to keep the
-                empty database tables after processing in complete.
-                This is for a marginal performance benefit if running
-                the splitting algorithm multiple times.
 
         Returns:
             data (FeatureCollection): A multipolygon of all the task boundaries.
@@ -201,6 +195,7 @@ class FMTMSplitter(object):
                 elif any(key in tags for key in ["highway", "waterway", "railway"]):
                     db_feature = DbOsmLines(**common_args)
                     temp_session.add(db_feature)
+            # Run on db (required)
             temp_session.commit()
 
             # Use raw sql for view generation & remainder of script
@@ -213,24 +208,31 @@ class FMTMSplitter(object):
                 "tags,geom FROM ways_line WHERE "
                 f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
             )
-            temp_session.execute(view)
+            temp_session.execute(view, params={"aoi_geom": aoi_geom})
+            # Run on db (required)
+            temp_session.commit()
 
             # Only insert buildings param is specified
             log.debug("Running task splitting algorithm")
             if buildings:
-                result = temp_session.execute(text(sql), params={"num_buildings": buildings}).fetchall()
+                result = temp_session.execute(text(sql), params={"num_buildings": buildings})
             else:
-                result = temp_session.execute(text(sql)).fetchall()
+                result = temp_session.execute(text(sql))
 
-            features = result[0][0]["features"]
+            features = result.fetchall()[0][0]["features"]
             if features:
                 log.info(f"Query returned {len(features)}")
             else:
                 log.info("Query returned no features")
+
+            # Run on db (required)
+            temp_session.commit()
             self.split_features = FeatureCollection(features)
 
-            # clean up the temporary tables, we don't care about the result
-            # optionally remove building, lines, and project_aoi tables
+        # clean up the temporary tables, we don't care about the result
+        # optionally remove building, lines, and project_aoi tables
+        # NOTE this must be done in a NEW session
+        with session() as temp_session:
             drop_cmd = (
                 "DROP TABLE IF EXISTS buildings CASCADE; "
                 "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
@@ -239,15 +241,14 @@ class FMTMSplitter(object):
                 "DROP TABLE IF EXISTS voronois CASCADE; "
                 "DROP TABLE IF EXISTS taskpolygons CASCADE; "
                 "DROP TABLE IF EXISTS splitpolygons CASCADE;"
+                "DROP TABLE IF EXISTS project_aoi CASCADE; "
+                "DROP TABLE IF EXISTS ways_poly CASCADE; "
+                "DROP TABLE IF EXISTS ways_line CASCADE;"
             )
-            if remove_tables:
-                drop_cmd += (
-                    "DROP TABLE IF EXISTS project_aoi CASCADE; "
-                    "DROP TABLE IF EXISTS ways_poly CASCADE; "
-                    "DROP TABLE IF EXISTS ways_line CASCADE; "
-                )
             log.debug(f"Running tables drop command: {drop_cmd}")
             temp_session.execute(text(drop_cmd))
+            # Run on db (required)
+            temp_session.commit()
 
         return self.split_features
 
@@ -325,7 +326,6 @@ def split_by_sql(
     num_buildings: str = None,
     osm_extract: Union[dict, FeatureCollection] = None,
     outfile: str = None,
-    remove_tables: bool = True,
 ) -> FeatureCollection:
     """Split an AOI with a custom SQL query or default FMTM query.
 
@@ -352,11 +352,6 @@ def split_by_sql(
         osm_extract (dict, FeatureCollection): an OSM extract geojson,
             containing building polygons, or linestrings.
         outfile(str): Output to a GeoJSON file on disk.
-        remove_tables (bool): Remove the generated database tables.
-            Defaults to True, but may be set to False to keep the
-            empty database tables after processing in complete.
-            This is for a marginal performance benefit if running
-            the splitting algorithm multiple times.
 
     Returns:
         features (FeatureCollection): A multipolygon of all the task boundaries.
@@ -375,7 +370,7 @@ def split_by_sql(
     sql = open(sql_file, "r")
     query = sql.read()
 
-    features = splitter.splitBySQL(query, db, num_buildings, osm_extract=osm_extract, remove_tables=remove_tables)
+    features = splitter.splitBySQL(query, db, num_buildings, osm_extract=osm_extract)
     if not features:
         msg = "Failed to generate split features."
         log.error(msg)
