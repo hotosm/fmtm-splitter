@@ -183,9 +183,12 @@ class FMTMSplitter(object):
         log.debug("Inserting data extract into db")
         with session() as temp_session:
             for feature in osm_extract["features"]:
+                # NOTE must handle format generated from FMTMSplitter __init__
                 wkb_element = from_shape(shape(feature["geometry"]), srid=4326)
-                properties = feature["properties"]
+                properties = feature.get("properties", {})
                 tags = properties.get("tags", {})
+                # Handle nested 'tags' key if present
+                tags = tags.get("tags", tags)
                 osm_id = properties.get("osm_id")
                 # Common attributes for db tables
                 common_args = dict(project_id=self.id, osm_id=osm_id, geom=wkb_element, tags=tags)
