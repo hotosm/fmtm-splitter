@@ -78,6 +78,8 @@ class FMTMSplitter(object):
         self.aoi["id"] = str(self.id)
         self.aoi.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
         self.aoi.drop(columns=["type"], inplace=True, errors="ignore")
+        # Drop any timestamps to prevent json parsing issues later
+        self.aoi.drop(columns=["timestamp"], inplace=True, errors="ignore")
         self.aoi.set_geometry("geom", inplace=True)
 
         # Init split features
