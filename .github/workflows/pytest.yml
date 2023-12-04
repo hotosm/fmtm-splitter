@@ -18,4 +18,4 @@ jobs:
       compose_service: splitter
       compose_command: pytest
       cache_extra_imgs: |
-        "docker.io/postgis/postgis:${{ vars.POSTGIS_TAG || 14-3.4-alpine }}"
+        "docker.io/postgis/postgis:14-3.4-alpine"
