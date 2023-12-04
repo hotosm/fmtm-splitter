@@ -62,7 +62,7 @@ class FMTMSplitter(object):
         # Parse AOI
         if isinstance(aoi, str) and Path(aoi).is_file():
             log.info(f"Parsing AOI from file {aoi}")
-            self.aoi = gpd.GeoDataFrame.from_file(aoi, crs="EPSG:4326")
+            self.aoi = gpd.read_file(aoi, crs="EPSG:4326")
         elif isinstance(aoi, str):
             log.info(f"Parsing AOI GeoJSON from string {aoi}")
             self.aoi = gpd.GeoDataFrame(geojson.loads(aoi), crs="EPSG:4326")
