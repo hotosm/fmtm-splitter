@@ -63,7 +63,9 @@ class FMTMSplitter(object):
         # Parse AOI
         if isinstance(aoi_obj, str) and Path(aoi_obj).is_file():
             log.info(f"Parsing AOI from file {aoi_obj}")
-            self.aoi = gpd.read_file(aoi_obj, crs="EPSG:4326")
+            with open(aoi_obj, "r") as jsonfile:
+                geojson_dict = geojson.load(jsonfile)
+            self.aoi = self.parse_geojson(geojson_dict)
         elif isinstance(aoi_obj, FeatureCollection):
             self.aoi = self.parse_geojson(aoi_obj)
         elif isinstance(aoi_obj, dict):
@@ -82,11 +84,6 @@ class FMTMSplitter(object):
         # Rename fields to match schema & set id field
         self.id = uuid4()
         self.aoi["id"] = str(self.id)
-        self.aoi.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
-        self.aoi.drop(columns=["type"], inplace=True, errors="ignore")
-        # Drop any timestamps to prevent json parsing issues later
-        self.aoi.drop(columns=["timestamp"], inplace=True, errors="ignore")
-        self.aoi.set_geometry("geom", inplace=True)
 
         # Init split features
         self.split_features = None
@@ -106,7 +103,24 @@ class FMTMSplitter(object):
             features = [geojson]
         else:
             features = [Feature(geojson)]
-        return gpd.GeoDataFrame(features, crs="EPSG:4326")
+
+        data = gpd.GeoDataFrame(features, crs="EPSG:4326")
+        return FMTMSplitter.tidy_columns(data)
+
+    @staticmethod
+    def tidy_columns(dataframe: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """Fix dataframe columns prior to geojson export or db insert.
+
+        Strips timestamps that are not json serializable.
+        Renames geometry column --> geom.
+        Removes 'type' field for insert into db.
+        """
+        dataframe.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
+        dataframe.set_geometry("geom", inplace=True)
+        dataframe.drop(columns=["type"], inplace=True, errors="ignore")
+        # Drop any timestamps to prevent json parsing issues later
+        dataframe.drop(columns=["timestamp"], inplace=True, errors="ignore")
+        return dataframe
 
     def splitBySquare(  # noqa: N802
         self,
@@ -282,7 +296,7 @@ class FMTMSplitter(object):
 
     def splitByFeature(  # noqa: N802
         self,
-        features: gpd.GeoDataFrame,
+        features: FeatureCollection,
     ) -> FeatureCollection:
         """Split the polygon by features in the database.
 
@@ -439,13 +453,12 @@ def split_by_features(
         features (FeatureCollection): A multipolygon of all the task boundaries.
 
     """
-    splitter = FMTMSplitter(aoi)
-
     if not geojson_input and not db_table:
         err = "Either geojson_input or db_table must be passed."
         log.error(err)
         raise ValueError(err)
 
+    splitter = FMTMSplitter(aoi)
     input_features = None
 
     # Features from database
@@ -457,8 +470,9 @@ def split_by_features(
     # Features from geojson
     if geojson_input:
         input_features = FMTMSplitter(geojson_input).aoi
+        input_features = geojson.loads(input_features.to_json())
 
-    if not isinstance(input_features, gpd.GeoDataFrame):
+    if not isinstance(input_features, FeatureCollection):
         msg = (
             f"Could not parse geojson data from {geojson_input}"
             if geojson_input
