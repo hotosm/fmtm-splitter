@@ -8,12 +8,12 @@ authors = [
 ]
 dependencies = [
     "geojson>=2.5.0",
-    "shapely>=1.8.5",
-    "sqlalchemy>=2.0.23",
-    "psycopg2>=2.9.9",
-    "numpy>=1.26.2",
-    "geopandas>=0.14.1",
-    "geoalchemy2>=0.14.2",
+    "shapely>=1.8.1",
+    "sqlalchemy>=2.0.0",
+    "psycopg2>=2.9.1",
+    "numpy>=1.21.0",
+    "geopandas>=0.11.0",
+    "geoalchemy2>=0.11.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
