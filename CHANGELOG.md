@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.2.2 (2023-12-05)
+
+### Fix
+
+- pass geojson as features, not geopandas df
+- manage aoi parsing: geom, feat, featcol
+- correct parsing of dict aoi objects
+
+### Refactor
+
+- reduce verbosity of logging when parsing geojsons
+- merge dict and str aoi parsing
+
 ## 0.2.1 (2023-12-05)
 
 ### Refactor
