@@ -37,15 +37,21 @@ def test_init_splitter_types(aoi_json):
     FMTMSplitter(geojson_str)
     # GeoJSON File
     FMTMSplitter("tests/testdata/kathmandu.geojson")
-    # GeoJSON Dict
+    # GeoJSON Dict FeatureCollection
     geojson_dict = dict(aoi_json)
     FMTMSplitter(geojson_dict)
+    # GeoJSON Dict Feature
+    feature = geojson_dict.get("features")[0]
+    FMTMSplitter(feature)
+    # GeoJSON Dict Polygon
+    polygon = feature.get("geometry")
+    FMTMSplitter(polygon)
 
 
 def test_split_by_square_with_str(aoi_json):
     """Test divide by square from geojson str and file."""
     features = split_by_square(
-        geojson.dumps(aoi_json.get("features")),
+        geojson.dumps(aoi_json.get("features")[0]),
         meters=50,
     )
     assert len(features.get("features")) == 54
