@@ -61,19 +61,17 @@ class FMTMSplitter(object):
             instance (FMTMSplitter): An instance of this class
         """
         # Parse AOI
+        log.info(f"Parsing GeoJSON from type {type(aoi_obj)}")
         if isinstance(aoi_obj, str) and Path(aoi_obj).is_file():
-            log.info(f"Parsing AOI from file {aoi_obj}")
             with open(aoi_obj, "r") as jsonfile:
                 geojson_dict = geojson.load(jsonfile)
             self.aoi = self.parse_geojson(geojson_dict)
         elif isinstance(aoi_obj, FeatureCollection):
             self.aoi = self.parse_geojson(aoi_obj)
         elif isinstance(aoi_obj, dict):
-            log.info(f"Parsing AOI GeoJSON from geojson dict {aoi_obj}")
             geojson_dict = geojson.loads(geojson.dumps(aoi_obj))
             self.aoi = self.parse_geojson(geojson_dict)
         elif isinstance(aoi_obj, str):
-            log.info(f"Parsing AOI GeoJSON from geojson str {aoi_obj}")
             geojson_dict = geojson.loads(aoi_obj)
             self.aoi = self.parse_geojson(geojson_dict)
         else:
@@ -104,6 +102,7 @@ class FMTMSplitter(object):
         else:
             features = [Feature(geojson)]
 
+        log.debug(f"Parsed {len(features)} features")
         data = gpd.GeoDataFrame(features, crs="EPSG:4326")
         return FMTMSplitter.tidy_columns(data)
 
@@ -469,8 +468,7 @@ def split_by_features(
 
     # Features from geojson
     if geojson_input:
-        input_features = FMTMSplitter(geojson_input).aoi
-        input_features = geojson.loads(input_features.to_json())
+        input_features = geojson.loads(FMTMSplitter(geojson_input).aoi.to_json())
 
     if not isinstance(input_features, FeatureCollection):
         msg = (
