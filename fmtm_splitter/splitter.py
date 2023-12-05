@@ -31,7 +31,7 @@ import geopandas as gpd
 import numpy as np
 from geoalchemy2 import Geometry
 from geoalchemy2.shape import from_shape
-from geojson import FeatureCollection
+from geojson import Feature, FeatureCollection
 from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -49,40 +49,33 @@ class FMTMSplitter(object):
 
     def __init__(
         self,
-        aoi: Union[str, FeatureCollection],
+        aoi_obj: Union[str, FeatureCollection],
     ):
         """This class splits a polygon into tasks using a variety of algorithms.
 
         Args:
-            aoi (str, FeatureCollection): Input AOI, either a file path,
+            aoi_obj (str, FeatureCollection): Input AOI, either a file path,
                 or GeoJSON string.
 
         Returns:
             instance (FMTMSplitter): An instance of this class
         """
         # Parse AOI
-        if isinstance(aoi, str) and Path(aoi).is_file():
-            log.info(f"Parsing AOI from file {aoi}")
-            self.aoi = gpd.read_file(aoi, crs="EPSG:4326")
-        elif isinstance(aoi, FeatureCollection):
-            self.aoi = gpd.GeoDataFrame(aoi.get("features"), crs="EPSG:4326")
-        elif isinstance(aoi, (dict, str)):
-            log.info(f"Parsing AOI GeoJSON from geojson {type(aoi)} {aoi}")
-            if isinstance(aoi, dict):
-                parsed_geojson = geojson.loads(geojson.dumps(aoi))
-            else:
-                parsed_geojson = geojson.loads(aoi)
-            # Parse and unparse geojson to extract type
-            if isinstance(parsed_geojson, FeatureCollection):
-                # Handle FeatureCollection nesting
-                features = parsed_geojson.get("features")
-            else:
-                # Parse and extract FeatureCollection to get a Feature
-                # GeoPandas requires a list of Features (with geometry key)
-                features = FeatureCollection(parsed_geojson).get("features")
-            self.aoi = gpd.GeoDataFrame(features, crs="EPSG:4326")
+        if isinstance(aoi_obj, str) and Path(aoi_obj).is_file():
+            log.info(f"Parsing AOI from file {aoi_obj}")
+            self.aoi = gpd.read_file(aoi_obj, crs="EPSG:4326")
+        elif isinstance(aoi_obj, FeatureCollection):
+            self.aoi = self.parse_geojson(aoi_obj)
+        elif isinstance(aoi_obj, dict):
+            log.info(f"Parsing AOI GeoJSON from geojson dict {aoi_obj}")
+            geojson_dict = geojson.loads(geojson.dumps(aoi_obj))
+            self.aoi = self.parse_geojson(geojson_dict)
+        elif isinstance(aoi_obj, str):
+            log.info(f"Parsing AOI GeoJSON from geojson str {aoi_obj}")
+            geojson_dict = geojson.loads(aoi_obj)
+            self.aoi = self.parse_geojson(geojson_dict)
         else:
-            err = f"The specified AOI is not valid (must be geojson or str): {aoi}"
+            err = f"The specified AOI is not valid (must be geojson or str): {aoi_obj}"
             log.error(err)
             raise ValueError(err)
 
@@ -97,6 +90,23 @@ class FMTMSplitter(object):
 
         # Init split features
         self.split_features = None
+
+    @staticmethod
+    def parse_geojson(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
+        """Parse GeoJSON and return GeoDataFrame.
+
+        The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
+        """
+        # Parse and unparse geojson to extract type
+        if isinstance(geojson, FeatureCollection):
+            # Handle FeatureCollection nesting
+            features = geojson.get("features")
+        elif isinstance(geojson, Feature):
+            # GeoPandas requests list of features
+            features = [geojson]
+        else:
+            features = [Feature(geojson)]
+        return gpd.GeoDataFrame(features, crs="EPSG:4326")
 
     def splitBySquare(  # noqa: N802
         self,
