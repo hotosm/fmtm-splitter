@@ -9,7 +9,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build.yml" target="_blank">
-      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Build/badge.svg" alt="Build">
+      <img src="https://github.com/hotosm/fmtm-splitter/actions/workflows/build.yml/badge.svg" alt="Build">
   </a>
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build-ci.yml" target="_blank">
       <img src="https://github.com/hotosm/fmtm-splitter/workflows/Build CI Img/badge.svg" alt="CI Build">
@@ -18,7 +18,7 @@
       <img src="https://github.com/hotosm/fmtm-splitter/workflows/Publish Docs/badge.svg" alt="Publish Docs">
   </a>
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/publish.yml" target="_blank">
-      <img src="https://github.com/hotosm/fmtm-splitter/workflows/Publish to PyPi.org/badge.svg" alt="Publish">
+      <img src="https://github.com/hotosm/fmtm-splitter/actions/workflows/publish.yml/badge.svg" alt="Publish">
   </a>
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/pytest.yml" target="_blank">
       <img src="https://github.com/hotosm/fmtm-splitter/workflows/PyTest/badge.svg" alt="Test">
