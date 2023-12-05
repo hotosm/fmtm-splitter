@@ -25,6 +25,8 @@ from typing import Optional, Union
 from uuid import uuid4
 
 import geojson
+
+# TODO refactor out geopandas
 import geopandas as gpd
 import numpy as np
 from geoalchemy2 import Geometry
