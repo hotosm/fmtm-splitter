@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.2.1 (2023-12-05)
+
+### Refactor
+
+- add comment to remove geopandas
+
 ## 0.2.0 (2023-12-04)
 
 ### Feat
