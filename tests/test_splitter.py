@@ -23,13 +23,27 @@ from uuid import uuid4
 
 import geojson
 
-from fmtm_splitter.splitter import main, split_by_features, split_by_sql, split_by_square
+from fmtm_splitter.splitter import FMTMSplitter, main, split_by_features, split_by_sql, split_by_square
 
 log = logging.getLogger(__name__)
 
 
+def test_init_splitter_types(aoi_json):
+    """Test parsing different types with FMTMSplitter."""
+    # FeatureCollection
+    FMTMSplitter(aoi_json)
+    # GeoJSON String
+    geojson_str = geojson.dumps(aoi_json)
+    FMTMSplitter(geojson_str)
+    # GeoJSON File
+    FMTMSplitter("tests/testdata/kathmandu.geojson")
+    # GeoJSON Dict
+    geojson_dict = dict(aoi_json)
+    FMTMSplitter(geojson_dict)
+
+
 def test_split_by_square_with_str(aoi_json):
-    """Test divide by square from geojson obj."""
+    """Test divide by square from geojson str and file."""
     features = split_by_square(
         geojson.dumps(aoi_json.get("features")),
         meters=50,
@@ -42,21 +56,7 @@ def test_split_by_square_with_str(aoi_json):
     assert len(features.get("features")) == 15
 
 
-def test_split_by_square_with_obj(aoi_json):
-    """Test divide by square from geojson obj."""
-    features = split_by_square(
-        aoi_json,
-        meters=50,
-    )
-    assert len(features.get("features")) == 54
-    features = split_by_square(
-        "tests/testdata/kathmandu.geojson",
-        meters=100,
-    )
-    assert len(features.get("features")) == 15
-
-
-def test_split_by_square_with_files():
+def test_split_by_square_with_file_output():
     """Test divide by square from geojson file.
 
     Also write output to file.
