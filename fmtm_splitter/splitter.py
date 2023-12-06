@@ -62,7 +62,8 @@ class FMTMSplitter(object):
         """
         # Parse AOI
         log.info(f"Parsing GeoJSON from type {type(aoi_obj)}")
-        if isinstance(aoi_obj, str) and Path(aoi_obj).is_file():
+        if isinstance(aoi_obj, str) and len(aoi_obj) < 250 and Path(aoi_obj).is_file():
+            # Impose restriction for path lengths <250 chars
             with open(aoi_obj, "r") as jsonfile:
                 geojson_dict = geojson.load(jsonfile)
             self.aoi = self.parse_geojson(geojson_dict)
