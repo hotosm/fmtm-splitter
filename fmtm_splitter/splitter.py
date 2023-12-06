@@ -73,6 +73,8 @@ class FMTMSplitter(object):
             geojson_dict = geojson.loads(geojson.dumps(aoi_obj))
             self.aoi = self.parse_geojson(geojson_dict)
         elif isinstance(aoi_obj, str):
+            geojson_truncated = aoi_obj if len(aoi_obj) < 250 else f"{aoi_obj[:250]}..."
+            log.debug(f"GeoJSON string passed: {geojson_truncated}")
             geojson_dict = geojson.loads(aoi_obj)
             self.aoi = self.parse_geojson(geojson_dict)
         else:
@@ -101,9 +103,11 @@ class FMTMSplitter(object):
             # GeoPandas requests list of features
             features = [geojson]
         else:
-            features = [Feature(geojson)]
+            # A standard geometry type. Has coordinates, no properties
+            features = [Feature(geometry=geojson)]
 
         log.debug(f"Parsed {len(features)} features")
+        log.debug("Converting to geodataframe")
         data = gpd.GeoDataFrame(features, crs="EPSG:4326")
         return FMTMSplitter.tidy_columns(data)
 
@@ -115,6 +119,7 @@ class FMTMSplitter(object):
         Renames geometry column --> geom.
         Removes 'type' field for insert into db.
         """
+        log.debug("Tidying up columns, renaming geometry to geom")
         dataframe.rename(columns={"geometry": "geom", "properties": "tags"}, inplace=True)
         dataframe.set_geometry("geom", inplace=True)
         dataframe.drop(columns=["type"], inplace=True, errors="ignore")
@@ -198,7 +203,7 @@ class FMTMSplitter(object):
         Base.metadata.create_all(conn)
 
         # Add aoi to project_aoi table
-        log.debug("Adding AOI to project_aoi table")
+        log.debug(f"Adding AOI to project_aoi table: {self.aoi.to_dict()}")
         self.aoi.to_postgis(
             "project_aoi",
             conn,
@@ -263,7 +268,7 @@ class FMTMSplitter(object):
 
             features = result.fetchall()[0][0]["features"]
             if features:
-                log.info(f"Query returned {len(features)}")
+                log.info(f"Query returned {len(features)} features")
             else:
                 log.info("Query returned no features")
 
