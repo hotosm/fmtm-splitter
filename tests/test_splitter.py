@@ -46,6 +46,9 @@ def test_init_splitter_types(aoi_json):
     # GeoJSON Dict Polygon
     polygon = feature.get("geometry")
     FMTMSplitter(polygon)
+    # FeatureCollection multiple geoms (4 polygons)
+    splitter = FMTMSplitter("tests/testdata/kathmandu_split.geojson")
+    assert len(splitter.aoi) == 4
 
 
 def test_split_by_square_with_str(aoi_json):
@@ -102,6 +105,19 @@ def test_split_by_sql_fmtm(aoi_json, extract_json, output_json):
     )
     assert len(features.get("features")) == 122
     assert sorted(features) == sorted(output_json)
+
+
+def test_split_by_sql_fmtm_multi_geom(aoi_json, extract_json, output_json):
+    """Test divide by square from geojson file with multiple geometries."""
+    with open("tests/testdata/kathmandu_split.geojson", "r") as jsonfile:
+        parsed_featcol = geojson.load(jsonfile)
+    features = split_by_sql(
+        parsed_featcol,
+        "postgresql://fmtm:dummycipassword@db:5432/splitter",
+        num_buildings=10,
+        osm_extract=extract_json,
+    )
+    assert len(features.get("features")) == 11
 
 
 def test_cli_help(capsys):
