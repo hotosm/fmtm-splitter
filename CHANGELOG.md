@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.2.3 (2023-12-06)
+
+### Fix
+
+- handle multiple geoms if within FeatureCollection
+- correctly handle file context for outputGeojson
+- fix parsing of Feature type, improve logging
+- prevent attempting to parse paths >250 chars (i.e. geojson)
+
 ## 0.2.2 (2023-12-05)
 
 ### Fix
