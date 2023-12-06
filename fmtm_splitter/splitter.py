@@ -385,6 +385,8 @@ def split_by_sql(
     - Split the task areas on major features such as roads an rivers, to
       avoid traversal of these features across task areas.
 
+    Also has handling for multiple geometries within FeatureCollection object.
+
     Args:
         aoi(str, FeatureCollection): Input AOI, either a file path,
             GeoJSON string, or FeatureCollection object.
@@ -403,8 +405,6 @@ def split_by_sql(
     Returns:
         features (FeatureCollection): A multipolygon of all the task boundaries.
     """
-    splitter = FMTMSplitter(aoi)
-
     if not sql_file and not num_buildings:
         err = "Either sql_file or num_buildings must be passed."
         log.error(err)
@@ -421,16 +421,39 @@ def split_by_sql(
     if osm_extract:
         extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
 
-    features = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
-    if not features:
+    # Handle multiple geometries passed
+    if isinstance(aoi, FeatureCollection):
+        # FIXME why does only one geom split during test?
+        # FIXME other geoms return None during splitting
+        if len(feat_array := aoi.get("features", [])) > 1:
+            split_geoms = []
+            for feat in feat_array:
+                splitter = FMTMSplitter(feat)
+                featcol = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
+                features = featcol.get("features", [])
+                if features:
+                    split_geoms += features
+            if not split_geoms:
+                msg = "Failed to generate split features."
+                log.error(msg)
+                raise ValueError(msg)
+            if outfile:
+                with open(outfile, "w") as jsonfile:
+                    geojson.dump(split_geoms, jsonfile)
+                    log.debug(f"Wrote split features to {outfile}")
+            # Parse FeatCols into single FeatCol
+            return FeatureCollection(split_geoms)
+
+    splitter = FMTMSplitter(aoi)
+    split_geoms = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
+    if not split_geoms:
         msg = "Failed to generate split features."
         log.error(msg)
         raise ValueError(msg)
-
     if outfile:
         splitter.outputGeojson(outfile)
 
-    return features
+    return split_geoms
 
 
 def split_by_features(
