@@ -331,9 +331,9 @@ class FMTMSplitter(object):
             log.error(msg)
             raise RuntimeError(msg)
 
-        jsonfile = open(filename, "w")
-        geojson.dump(self.split_features, jsonfile)
-        log.debug(f"Wrote split features to {filename}")
+        with open(filename, "w") as jsonfile:
+            geojson.dump(self.split_features, jsonfile)
+            log.debug(f"Wrote split features to {filename}")
 
 
 def split_by_square(
