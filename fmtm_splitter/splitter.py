@@ -200,6 +200,7 @@ class FMTMSplitter(object):
 
         # Generate db tables if not exist
         log.debug("Generating required temp tables")
+        Base.metadata.drop_all(conn)
         Base.metadata.create_all(conn)
 
         # Add aoi to project_aoi table
