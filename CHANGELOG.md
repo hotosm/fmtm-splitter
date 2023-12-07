@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.2.4 (2023-12-07)
+
+### Fix
+
+- run drop_all for tables prior to create_all (if exist)
+- split_by_sql if no data extract provided
+
 ## 0.2.3 (2023-12-06)
 
 ### Fix
