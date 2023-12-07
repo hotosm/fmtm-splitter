@@ -417,6 +417,7 @@ def split_by_sql(
     with open(sql_file, "r") as sql:
         query = sql.read()
 
+    extract_geojson = None
     # Extracts and parse extract geojson
     if osm_extract:
         extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
