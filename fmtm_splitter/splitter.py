@@ -256,6 +256,7 @@ class FMTMSplitter(object):
                 "tags,geom FROM ways_line WHERE "
                 f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
             )
+            # FIXME params is redundant if using f-string, update
             temp_session.execute(view, params={"aoi_geom": aoi_geom})
             # Run on db (required)
             temp_session.commit()
