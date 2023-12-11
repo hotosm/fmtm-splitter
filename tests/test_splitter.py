@@ -17,6 +17,7 @@
 #
 """Test task splitting algorithms."""
 
+import json
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -51,13 +52,35 @@ def test_init_splitter_types(aoi_json):
     assert len(splitter.aoi) == 4
 
 
+def test_split_by_square_with_dict(aoi_json):
+    """Test divide by square from geojson dict types."""
+    features = split_by_square(
+        aoi_json.get("features")[0],
+        meters=50,
+    )
+    assert len(features.get("features")) == 54
+    features = split_by_square(
+        aoi_json.get("features")[0].get("geometry"),
+        meters=50,
+    )
+    assert len(features.get("features")) == 54
+
+
 def test_split_by_square_with_str(aoi_json):
     """Test divide by square from geojson str and file."""
+    # GeoJSON Dumps
     features = split_by_square(
         geojson.dumps(aoi_json.get("features")[0]),
         meters=50,
     )
     assert len(features.get("features")) == 54
+    # JSON Dumps
+    features = split_by_square(
+        json.dumps(aoi_json.get("features")[0].get("geometry")),
+        meters=50,
+    )
+    assert len(features.get("features")) == 54
+    # File
     features = split_by_square(
         "tests/testdata/kathmandu.geojson",
         meters=100,
