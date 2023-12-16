@@ -18,6 +18,7 @@
 """Class and helper methods for task splitting."""
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -220,6 +221,19 @@ class FMTMSplitter(object):
         # a few features without a geometry. But we like it to create the
         # table the feature splitting needs to work without modification
 
+        def json_str_to_dict(json_item: Union[str, dict]) -> dict:
+            """Convert a JSON string to dict."""
+            if isinstance(json_item, dict):
+                return json_item
+            if isinstance(json_item, str):
+                try:
+                    return json.loads(json_item)
+                except json.JSONDecodeError:
+                    msg = f"Error decoding key in GeoJSON: {json_item}"
+                    log.error(msg)
+                    # Set tags to empty, skip feature
+                    return {}
+
         # Create a new session in engine connection
         session = new_session(conn)
         # Insert data extract into db
@@ -230,19 +244,24 @@ class FMTMSplitter(object):
                 wkb_element = from_shape(shape(feature["geometry"]), srid=4326)
                 properties = feature.get("properties", {})
                 tags = properties.get("tags", {})
+
                 # Handle nested 'tags' key if present
-                tags = tags.get("tags", tags)
+                tags = json_str_to_dict(tags.get("tags", tags))
                 osm_id = properties.get("osm_id")
+
                 # Common attributes for db tables
                 common_args = dict(project_id=self.id, osm_id=osm_id, geom=wkb_element, tags=tags)
+
                 # Insert building polygons
                 if tags.get("building") == "yes":
                     db_feature = DbBuildings(**common_args)
                     temp_session.add(db_feature)
+
                 # Insert highway/waterway/railway polylines
                 elif any(key in tags for key in ["highway", "waterway", "railway"]):
                     db_feature = DbOsmLines(**common_args)
                     temp_session.add(db_feature)
+
             # Run on db (required)
             temp_session.commit()
 
