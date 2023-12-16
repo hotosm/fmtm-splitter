@@ -423,6 +423,10 @@ def split_by_sql(
     # Extracts and parse extract geojson
     if osm_extract:
         extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
+    if not extract_geojson:
+        err = "A valid data extract must be provided."
+        log.error(err)
+        raise ValueError(err)
 
     # Handle multiple geometries passed
     if isinstance(aoi, FeatureCollection):
