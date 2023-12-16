@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.2.5 (2023-12-16)
+
+### Fix
+
+- improve handling of tags as json str
+- return error on empty or invalid data extract
+
 ## 0.2.4 (2023-12-07)
 
 ### Fix
