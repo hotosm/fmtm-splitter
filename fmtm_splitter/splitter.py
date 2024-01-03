@@ -206,6 +206,7 @@ class FMTMSplitter(object):
 
         # Add aoi to project_aoi table
         log.debug(f"Adding AOI to project_aoi table: {self.aoi.to_dict()}")
+        self.aoi["tags"] = self.aoi["tags"].apply(json.dumps)
         self.aoi.to_postgis(
             "project_aoi",
             conn,
