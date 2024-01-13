@@ -29,7 +29,7 @@
   <a href="https://pypistats.org/packages/fmtm-splitter" target="_blank">
       <img src="https://img.shields.io/pypi/dm/fmtm-splitter.svg" alt="Downloads">
   </a>
-  <a href="https://github.com/hotosm/fmtm-splitter/blob/main/LICENSE" target="_blank">
+  <a href="https://github.com/hotosm/fmtm-splitter/blob/main/LICENSE.md" target="_blank">
       <img src="https://img.shields.io/github/license/hotosm/fmtm-splitter.svg" alt="License">
   </a>
 </p>
