@@ -66,5 +66,6 @@ nav:
   - About: about.md
   - Usage: usage.md
   - API: api.md
-  - License: LICENSE
+  - License: LICENSE.md
   - Changelog: CHANGELOG.md
+  - Versioning: https://docs.hotosm.org/dev-guide/version-control/#creating-releases
