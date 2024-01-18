@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.2.6 (2024-01-18)
+
+### Fix
+
+- invalid tag json parsing PR (#20)
+
 ## 0.2.5 (2023-12-16)
 
 ### Fix
