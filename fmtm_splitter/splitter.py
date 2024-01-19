@@ -303,6 +303,7 @@ class FMTMSplitter(object):
         # NOTE this must be done in a NEW session
         with session() as temp_session:
             drop_cmd = (
+                "DROP VIEW IF EXISTS lines_view;"
                 "DROP TABLE IF EXISTS buildings CASCADE; "
                 "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
                 "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
