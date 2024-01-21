@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 1.0.0rc0 (2024-01-21)
+
+### Feat
+
+- remove sqlalchemy and geoalchemy, use psycopg2 directly
+
+### Fix
+
+- cleanup view lines_view after splitting complete
+
+### Refactor
+
+- fix all linting errors for pre-commit
+
 ## 0.2.6 (2024-01-18)
 
 ### Fix
