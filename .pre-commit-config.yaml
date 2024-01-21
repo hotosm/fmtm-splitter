@@ -29,7 +29,8 @@ repos:
           [
             --ignore-unknown,
             --no-error-on-unmatched-pattern,
-            "!chart/**",
+            "!fmtm-splitter/fmtm-splitter_osm_buildings/**",
+            "!postgis_snippets/**",
             "!CHANGELOG.md",
             "!tests/testdata/*",
           ]
@@ -38,4 +39,15 @@ repos:
     rev: v0.38.0
     hooks:
       - id: markdownlint
-        args: [--fix, --ignore, CHANGELOG.md, --ignore, LICENSE.md]
+        args:
+          [
+            --fix,
+            --ignore,
+            CHANGELOG.md,
+            --ignore,
+            LICENSE.md,
+            --ignore,
+            postgis_snippets/**/*.md,
+            --ignore,
+            fmtm_splitter/fmtm-splitter_osm_buildings/*.md,
+          ]
