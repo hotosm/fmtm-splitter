@@ -140,7 +140,18 @@ def test_split_by_sql_fmtm_multi_geom(aoi_json, extract_json, output_json):
         num_buildings=10,
         osm_extract=extract_json,
     )
+
+    assert isinstance(features, geojson.feature.FeatureCollection)
+    assert isinstance(features.get("features"), list)
+    assert isinstance(features.get("features")[0], dict)
     assert len(features.get("features")) == 11
+
+    # This geom has a hole, so is MultiPolygon
+    multipolygon = geojson.loads(json.dumps(features.get("features")[0].get("geometry")))
+    assert isinstance(multipolygon, geojson.geometry.MultiPolygon)
+
+    polygon = geojson.loads(json.dumps(features.get("features")[3].get("geometry")))
+    assert isinstance(polygon, geojson.geometry.Polygon)
 
 
 def test_cli_help(capsys):
