@@ -20,7 +20,7 @@ complications with other developers. The old free software joke is
 "patches are better than bug reports" is how we contribute to the
 community of people involved with this project.
 
-# If you are reporting a problem
+## If you are reporting a problem
 
 - Describe exactly what you were trying to achieve, what you did, what you
   expected to happen and what did happen instead. Include relevant information
@@ -32,7 +32,7 @@ community of people involved with this project.
   keeps issues small and manageable and makes it much easier to follow through
   and make sure each problem is taken care of.
 
-## Documentation
+### Documentation
 
 Project documentation should be in [Markdown
 format](https://www.markdownguide.org/), and in a _docs_
@@ -40,7 +40,7 @@ subdirectory. While it is possible to use HTML in Markdown documents
 for tables and images, it is prefered to use the Markdown style as
 it's much easier to read.
 
-## Coding Style
+### Coding Style
 
 Python enforces a certain amount of style due to indent levels. Unlike
 C/C++, we don't have to worry about curly braces. It is prefered that
