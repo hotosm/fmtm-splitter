@@ -5,7 +5,7 @@
   <img src="https://github.com/hotosm/fmtm/blob/main/images/hot_logo.png?raw=true" style="width: 200px;" alt="HOT"></a>
 </p>
 <p align="center">
-  <em>A utility for splitting a polygon onto multiple tasks.</em>
+  <em>A utility for splitting an AOI into multiple tasks.</em>
 </p>
 <p align="center">
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build.yml" target="_blank">

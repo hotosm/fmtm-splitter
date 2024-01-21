@@ -1,7 +1,7 @@
 [project]
 name = "fmtm-splitter"
 dynamic = ["version"]
-description = "A program for splitting a large AOI into smaller tasks."
+description = "A utility for splitting an AOI into multiple tasks."
 authors = [
     {name = "Rob Savoye", email = "rob.savoye@hotosm.org"},
     {name = "Sam Woodcock", email = "sam.woodcock@hotosm.org"},
