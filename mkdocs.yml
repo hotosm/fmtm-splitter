@@ -68,5 +68,6 @@ nav:
   - Usage: usage.md
   - API: api.md
   - License: LICENSE.md
+  - Code of Conduct: https://docs.hotosm.org/code-of-conduct
   - Changelog: CHANGELOG.md
   - Versioning: https://docs.hotosm.org/dev-guide/version-control/#creating-releases

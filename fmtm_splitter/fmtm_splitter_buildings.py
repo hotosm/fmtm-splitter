@@ -15,6 +15,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fmtm-splitter.  If not, see <https:#www.gnu.org/licenses/>.
 #
+"""Test util to split by various SQL algorithms."""
 
 import argparse
 import logging
@@ -29,7 +30,7 @@ from osgeo import gdal
 log = logging.getLogger(__name__)
 
 
-def splitByBuildings(
+def split_by_buildings(
     aoi: str,  # GeoJSON polygon input file
     queries: list,  # list of SQL queries
     dbd: list,  # database host, dbname, user, password
@@ -115,4 +116,4 @@ if __name__ == "__main__":
         with open(os.path.join(modulardir, sqlfile), "r") as sql:
             modularqueries.append(sql.read().replace("{%numfeatures%}", str(args.numfeatures)))
     dbdetails = [args.host, args.database, args.user, args.password]
-    features = splitByBuildings(aoi, modularqueries, dbdetails)
+    features = split_by_buildings(aoi, modularqueries, dbdetails)
