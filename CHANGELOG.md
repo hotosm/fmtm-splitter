@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.0.0 (2024-01-30)
+
+### Fix
+
+- also accept sqlalchemy.orm.Session objects
+- num_buildings is int type (not str)
+
+### Refactor
+
+- suppress geopandas 'column does not contain geometry'
+
 ## 1.0.0rc0 (2024-01-21)
 
 ### Feat
