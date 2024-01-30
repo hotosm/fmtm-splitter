@@ -348,7 +348,7 @@ def split_by_sql(
     aoi: Union[str, FeatureCollection],
     db: Union[str, connection],
     sql_file: str = None,
-    num_buildings: str = None,
+    num_buildings: int = None,
     osm_extract: Union[str, FeatureCollection] = None,
     outfile: str = None,
 ) -> FeatureCollection:
