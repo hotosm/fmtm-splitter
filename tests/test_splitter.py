@@ -150,6 +150,7 @@ def test_split_by_sql_fmtm_multi_geom(aoi_json, extract_json, output_json):
     multipolygon = geojson.loads(json.dumps(features.get("features")[0].get("geometry")))
     assert isinstance(multipolygon, geojson.geometry.MultiPolygon)
 
+    # Then geom is a standard Polygon
     polygon = geojson.loads(json.dumps(features.get("features")[3].get("geometry")))
     assert isinstance(polygon, geojson.geometry.Polygon)
 

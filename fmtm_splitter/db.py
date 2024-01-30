@@ -24,6 +24,13 @@ import psycopg2
 from psycopg2.extensions import register_adapter
 from psycopg2.extras import Json, execute_values, register_uuid
 
+try:
+    import sqlalchemy
+
+    _sqlalchemy_import = True
+except ImportError:
+    _sqlalchemy_import = False
+
 log = logging.getLogger(__name__)
 
 
@@ -31,12 +38,15 @@ def create_connection(db: Union[str, psycopg2.extensions.connection]) -> psycopg
     """Get db connection from existing psycopg2 connection, or URL string.
 
     Args:
-        db (Union[str, psycopg2.extensions.connection]): string or psycopg2 connection.
+        db (str, psycopg2.extensions.connection, sqlalchemy.orm.session.Session):
+            string or existing db connection.
             If `db` is a string, a new connection is generated.
             If `db` is a psycopg connection, the connection is re-used.
+            If `db` is a sqlalchemy.orm.session.Session object, the connection
+                is also reused.
 
     Returns:
-        conn: psycopg2 connection object to generate cursors from.
+        conn: DBAPI connection object to generate cursors from.
     """
     # Makes Postgres UUID, JSONB usable, else error
     register_uuid()
@@ -46,8 +56,10 @@ def create_connection(db: Union[str, psycopg2.extensions.connection]) -> psycopg
         conn = db
     elif isinstance(db, str):
         conn = psycopg2.connect(db)
+    elif _sqlalchemy_import and isinstance(db, sqlalchemy.orm.session.Session):
+        conn = db.connection().connection
     else:
-        msg = "The `db` variable is not a valid string or psycopg.connection"
+        msg = "The `db` variable is not a valid string, psycopg connection, " "or SQLAlchemy Session."
         log.error(msg)
         raise ValueError(msg)
 
@@ -97,7 +109,7 @@ def create_tables(conn: psycopg2.extensions.connection):
             tags JSONB
         );
     """
-    log.debug(f"Running tables create command: {create_cmd}")
+    log.debug("Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'")
     cur = conn.cursor()
     cur.execute(create_cmd)
 
