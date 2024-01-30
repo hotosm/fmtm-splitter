@@ -16,6 +16,7 @@
 #
 """DB models for temporary tables in splitBySQL."""
 import logging
+import warnings
 from typing import Union
 
 import geopandas as gpd
@@ -148,7 +149,12 @@ def gdf_to_postgis(gdf: gpd.GeoDataFrame, conn: psycopg2.extensions.connection, 
         gdf = gdf.rename(columns={gdf.geometry.name: geom_name}).set_geometry(geom_name, crs=gdf.crs)
 
     log.debug("Converting geodataframe geom to wkb hex string")
+    # Ignore warning 'Geometry column does not contain geometry'
+    warnings.filterwarnings("ignore", category=UserWarning, module="fmtm_splitter.db")
     gdf[geom_name] = gdf[geom_name].to_wkb(hex=True, include_srid=True)
+    warnings.filterwarnings("default", category=UserWarning, module="fmtm_splitter.db")
+
+    # Build numpy array for db insert
     tuples = [tuple(x) for x in gdf.to_numpy()]
     cols = ",".join(list(gdf.columns))
     query = "INSERT INTO %s(%s) VALUES %%s" % (table_name, cols)
