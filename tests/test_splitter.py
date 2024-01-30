@@ -118,11 +118,11 @@ def test_split_by_features_geojson(aoi_json):
     assert len(features.get("features")) == 4
 
 
-def test_split_by_sql_fmtm(aoi_json, extract_json, output_json):
+def test_split_by_sql_fmtm(db, aoi_json, extract_json, output_json):
     """Test divide by square from geojson file."""
     features = split_by_sql(
         aoi_json,
-        "postgresql://fmtm:dummycipassword@db:5432/splitter",
+        db,
         num_buildings=5,
         osm_extract=extract_json,
     )
