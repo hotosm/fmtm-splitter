@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## 1.0.0 (2024-01-30)
+
+### Fix
+
+- also accept sqlalchemy.orm.Session objects
+- num_buildings is int type (not str)
+
+### Refactor
+
+- suppress geopandas 'column does not contain geometry'
+
+## 1.0.0rc0 (2024-01-21)
+
+### Feat
+
+- remove sqlalchemy and geoalchemy, use psycopg2 directly
+
+### Fix
+
+- cleanup view lines_view after splitting complete
+
+### Refactor
+
+- fix all linting errors for pre-commit
+
+## 0.2.6 (2024-01-18)
+
+### Fix
+
+- invalid tag json parsing PR (#20)
+
 ## 0.2.5 (2023-12-16)
 
 ### Fix

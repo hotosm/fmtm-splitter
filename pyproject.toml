@@ -1,7 +1,7 @@
 [project]
 name = "fmtm-splitter"
 dynamic = ["version"]
-description = "A program for splitting a large AOI into smaller tasks."
+description = "A utility for splitting an AOI into multiple tasks."
 authors = [
     {name = "Rob Savoye", email = "rob.savoye@hotosm.org"},
     {name = "Sam Woodcock", email = "sam.woodcock@hotosm.org"},
@@ -9,11 +9,9 @@ authors = [
 dependencies = [
     "geojson>=2.5.0",
     "shapely>=1.8.1",
-    "sqlalchemy>=2.0.0",
     "psycopg2>=2.9.1",
     "numpy>=1.21.0",
     "geopandas>=0.11.0",
-    "geoalchemy2>=0.11.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -45,7 +43,7 @@ pythonpath = "fmtm_splitter"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.2.5"
+version = "1.0.0"
 version_files = [
     "pyproject.toml:version",
     "fmtm_splitter/__version__.py",

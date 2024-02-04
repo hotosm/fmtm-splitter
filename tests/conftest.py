@@ -18,29 +18,19 @@
 """Configuration and fixtures for PyTest."""
 
 import logging
-
-# from typing import Any, Generator
 from pathlib import Path
 
 import geojson
+import psycopg2
 import pytest
-
-# from sqlalchemy import create_engine
-# from sqlalchemy.orm import sessionmaker
-# from sqlalchemy_utils import create_database, database_exists
-
-# engine = create_engine(settings.FMTM_DB_URL.unicode_string())
-# TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# Base.metadata.create_all(bind=engine)
 
 log = logging.getLogger(__name__)
 
 
-def pytest_configure(config):
-    """Configure pytest runs."""
-    # Stop sqlalchemy logs
-    sqlalchemy_log = logging.getLogger("sqlalchemy")
-    sqlalchemy_log.propagate = False
+@pytest.fixture(scope="session")
+def db():
+    """Existing psycopg2 connection."""
+    return psycopg2.connect("postgresql://fmtm:dummycipassword@db:5432/splitter")
 
 
 @pytest.fixture(scope="session")
@@ -91,31 +81,3 @@ def output_json():
     path = Path(__file__).parent / "testdata" / "kathmandu_processed.geojson"
     with open(path, "r") as jsonfile:
         return geojson.load(jsonfile)
-
-
-# @pytest.fixture(scope="session")
-# def db_engine():
-#     """The SQLAlchemy database engine to init."""
-#     engine = create_engine(settings.FMTM_DB_URL.unicode_string())
-#     if not database_exists:
-#         create_database(engine.url)
-
-#     Base.metadata.create_all(bind=engine)
-#     yield engine
-
-
-# @pytest.fixture(scope="function")
-# def db(db_engine):
-#     """Database session using db_engine."""
-#     connection = db_engine.connect()
-
-#     # begin a non-ORM transaction
-#     connection.begin()
-
-#     # bind an individual Session to the connection
-#     db = TestingSessionLocal(bind=connection)
-
-#     yield db
-
-#     db.rollback()
-#     connection.close()

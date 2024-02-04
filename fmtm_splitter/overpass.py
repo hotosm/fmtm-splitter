@@ -1,5 +1,7 @@
 #!/bin/python3
 
+"""Utils to split using Overpass API."""
+
 import argparse
 import os
 import subprocess
@@ -20,12 +22,10 @@ def aoiextent(aoifile):
 
 
 def query(query_string, overpass_url):
-    """Accept a query in Overpass API query language,
-    return an osm dataset.
-    """
+    """Accept a query in Overpass API query language, return an osm dataset."""
     try:
         response = requests.get(overpass_url, params={"data": query_string})
-    except:
+    except Exception:
         print("overpass did not want to answer that one\n")
     if response.status_code == 200:
         print(f"The overpass API at {overpass_url} accepted the query and " f"returned something.")

@@ -30,16 +30,12 @@ import geojson
 # TODO refactor out geopandas
 import geopandas as gpd
 import numpy as np
-from geoalchemy2 import Geometry
-from geoalchemy2.shape import from_shape
 from geojson import Feature, FeatureCollection
+from psycopg2.extensions import connection
 from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import text
 
-from fmtm_splitter.db import Base, DbBuildings, DbOsmLines, get_engine, new_session
+from fmtm_splitter.db import close_connection, create_connection, create_tables, drop_tables, gdf_to_postgis, insert_geom
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -165,7 +161,7 @@ class FMTMSplitter(object):
     def splitBySQL(  # noqa: N802
         self,
         sql: str,
-        db: Union[str, Session],
+        db: Union[str, connection],
         buildings: int,
         osm_extract: Union[dict, FeatureCollection] = None,
     ) -> FeatureCollection:
@@ -175,11 +171,11 @@ class FMTMSplitter(object):
 
         Args:
             sql (str): The SQL query to execute
-            db(str, Session): The db url, format:
+            db (str, psycopg2.extensions.connection): The db url, format:
                 postgresql://myusername:mypassword@myhost:5432/mydatabase
-                OR an SQLAlchemy Session object that is reused.
-                Passing an Session object prevents requring additional
-                database sessions to be spawned.
+                OR an psycopg2 connection object object that is reused.
+                Passing an connection object prevents requiring additional
+                database connections to be spawned.
             buildings (int): The number of buildings in each task
             osm_extract (dict, FeatureCollection): an OSM extract geojson,
                 containing building polygons, or linestrings.
@@ -197,29 +193,16 @@ class FMTMSplitter(object):
             raise ValueError(msg)
 
         # Get existing db engine, or create new one
-        conn = get_engine(db)
+        conn = create_connection(db)
 
         # Generate db tables if not exist
         log.debug("Generating required temp tables")
-        Base.metadata.drop_all(conn)
-        Base.metadata.create_all(conn)
+        create_tables(conn)
 
         # Add aoi to project_aoi table
         log.debug(f"Adding AOI to project_aoi table: {self.aoi.to_dict()}")
-        self.aoi.to_postgis(
-            "project_aoi",
-            conn,
-            if_exists="replace",
-            index=False,
-            dtype={
-                "id": UUID,
-                "geom": Geometry("GEOMETRY", srid=4326),
-                "tags": JSONB,
-            },
-        )
-        # FIXME: geopandas chokes with this SQL query as it leaves a
-        # a few features without a geometry. But we like it to create the
-        # table the feature splitting needs to work without modification
+        self.aoi["tags"] = self.aoi["tags"].apply(json.dumps)
+        gdf_to_postgis(self.aoi, conn, "project_aoi", "geom")
 
         def json_str_to_dict(json_item: Union[str, dict]) -> dict:
             """Convert a JSON string to dict."""
@@ -234,89 +217,63 @@ class FMTMSplitter(object):
                     # Set tags to empty, skip feature
                     return {}
 
-        # Create a new session in engine connection
-        session = new_session(conn)
-        # Insert data extract into db
+        # Insert data extract into db, using same cursor
         log.debug("Inserting data extract into db")
-        with session() as temp_session:
-            for feature in osm_extract["features"]:
-                # NOTE must handle format generated from FMTMSplitter __init__
-                wkb_element = from_shape(shape(feature["geometry"]), srid=4326)
-                properties = feature.get("properties", {})
-                tags = properties.get("tags", {})
+        cur = conn.cursor()
+        for feature in osm_extract["features"]:
+            # NOTE must handle format generated from FMTMSplitter __init__
+            wkb_element = shape(feature["geometry"]).wkb_hex
+            properties = feature.get("properties", {})
+            tags = properties.get("tags", {})
 
-                # Handle nested 'tags' key if present
-                tags = json_str_to_dict(tags.get("tags", tags))
-                osm_id = properties.get("osm_id")
+            # Handle nested 'tags' key if present
+            tags = json_str_to_dict(tags.get("tags", tags))
+            osm_id = properties.get("osm_id")
 
-                # Common attributes for db tables
-                common_args = dict(project_id=self.id, osm_id=osm_id, geom=wkb_element, tags=tags)
+            # Common attributes for db tables
+            common_args = dict(project_id=self.id, osm_id=osm_id, geom=wkb_element, tags=tags)
 
-                # Insert building polygons
-                if tags.get("building") == "yes":
-                    db_feature = DbBuildings(**common_args)
-                    temp_session.add(db_feature)
+            # Insert building polygons
+            if tags.get("building") == "yes":
+                insert_geom(cur, "ways_poly", **common_args)
 
-                # Insert highway/waterway/railway polylines
-                elif any(key in tags for key in ["highway", "waterway", "railway"]):
-                    db_feature = DbOsmLines(**common_args)
-                    temp_session.add(db_feature)
+            # Insert highway/waterway/railway polylines
+            elif any(key in tags for key in ["highway", "waterway", "railway"]):
+                insert_geom(cur, "ways_line", **common_args)
 
-            # Run on db (required)
-            temp_session.commit()
+        # Use raw sql for view generation & remainder of script
+        log.debug("Creating db view with intersecting highways")
+        # Get aoi as geojson
+        aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
+        view = (
+            "DROP VIEW IF EXISTS lines_view;"
+            "CREATE VIEW lines_view AS SELECT "
+            "tags,geom FROM ways_line WHERE "
+            "ST_CONTAINS(ST_GeomFromGeoJson(%(geojson_str)s), geom)"
+        )
+        cur.execute(view, {"geojson_str": aoi_geom})
+        # Close current cursor
+        cur.close()
 
-            # Use raw sql for view generation & remainder of script
-            log.debug("Creating db view with intersecting highways")
-            # Get aoi as geojson
-            aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
-            view = text(
-                "DROP VIEW IF EXISTS lines_view;"
-                "CREATE VIEW lines_view AS SELECT "
-                "tags,geom FROM ways_line WHERE "
-                f"ST_CONTAINS(ST_GeomFromGeoJson('{aoi_geom}'), geom)"
-            )
-            # FIXME params is redundant if using f-string, update
-            temp_session.execute(view, params={"aoi_geom": aoi_geom})
-            # Run on db (required)
-            temp_session.commit()
+        splitter_cursor = conn.cursor()
+        # Only insert buildings param is specified
+        log.debug("Running task splitting algorithm")
+        if buildings:
+            splitter_cursor.execute(sql, {"num_buildings": buildings})
+        else:
+            splitter_cursor.execute(sql)
 
-            # Only insert buildings param is specified
-            log.debug("Running task splitting algorithm")
-            if buildings:
-                result = temp_session.execute(text(sql), params={"num_buildings": buildings})
-            else:
-                result = temp_session.execute(text(sql))
+        features = splitter_cursor.fetchall()[0][0]["features"]
+        if features:
+            log.info(f"Query returned {len(features)} features")
+        else:
+            log.info("Query returned no features")
 
-            features = result.fetchall()[0][0]["features"]
-            if features:
-                log.info(f"Query returned {len(features)} features")
-            else:
-                log.info("Query returned no features")
+        self.split_features = FeatureCollection(features)
 
-            # Run on db (required)
-            temp_session.commit()
-            self.split_features = FeatureCollection(features)
-
-        # clean up the temporary tables, we don't care about the result
-        # optionally remove building, lines, and project_aoi tables
-        # NOTE this must be done in a NEW session
-        with session() as temp_session:
-            drop_cmd = (
-                "DROP TABLE IF EXISTS buildings CASCADE; "
-                "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
-                "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
-                "DROP TABLE IF EXISTS lowfeaturecountpolygons CASCADE; "
-                "DROP TABLE IF EXISTS voronois CASCADE; "
-                "DROP TABLE IF EXISTS taskpolygons CASCADE; "
-                "DROP TABLE IF EXISTS splitpolygons CASCADE;"
-                "DROP TABLE IF EXISTS project_aoi CASCADE; "
-                "DROP TABLE IF EXISTS ways_poly CASCADE; "
-                "DROP TABLE IF EXISTS ways_line CASCADE;"
-            )
-            log.debug(f"Running tables drop command: {drop_cmd}")
-            temp_session.execute(text(drop_cmd))
-            # Run on db (required)
-            temp_session.commit()
+        # Drop tables & close (+commit) db connection
+        drop_tables(conn)
+        close_connection(conn)
 
         return self.split_features
 
@@ -389,9 +346,9 @@ def split_by_square(
 
 def split_by_sql(
     aoi: Union[str, FeatureCollection],
-    db: Union[str, Session],
+    db: Union[str, connection],
     sql_file: str = None,
-    num_buildings: str = None,
+    num_buildings: int = None,
     osm_extract: Union[str, FeatureCollection] = None,
     outfile: str = None,
 ) -> FeatureCollection:
@@ -411,11 +368,11 @@ def split_by_sql(
     Args:
         aoi(str, FeatureCollection): Input AOI, either a file path,
             GeoJSON string, or FeatureCollection object.
-        db(str, Session): The db url, format:
+        db (str, psycopg2.extensions.connection): The db url, format:
             postgresql://myusername:mypassword@myhost:5432/mydatabase
-            OR an SQLAlchemy Session object that is reused.
-            Passing an Session object prevents requring additional
-            database sessions to be spawned.
+            OR an psycopg2 connection object that is reused.
+            Passing an connection object prevents requring additional
+            database connections to be spawned.
         sql_file(str): Path to custom splitting algorithm.
         num_buildings(str): The number of buildings to optimise the FMTM
             splitting algorithm with (approx buildings per generated feature).

@@ -5,7 +5,7 @@
   <img src="https://github.com/hotosm/fmtm/blob/main/images/hot_logo.png?raw=true" style="width: 200px;" alt="HOT"></a>
 </p>
 <p align="center">
-  <em>A utility for splitting a polygon onto multiple tasks.</em>
+  <em>A utility for splitting an AOI into multiple tasks.</em>
 </p>
 <p align="center">
   <a href="https://github.com/hotosm/fmtm-splitter/actions/workflows/build.yml" target="_blank">
@@ -29,7 +29,7 @@
   <a href="https://pypistats.org/packages/fmtm-splitter" target="_blank">
       <img src="https://img.shields.io/pypi/dm/fmtm-splitter.svg" alt="Downloads">
   </a>
-  <a href="https://github.com/hotosm/fmtm-splitter/blob/main/LICENSE" target="_blank">
+  <a href="https://github.com/hotosm/fmtm-splitter/blob/main/LICENSE.md" target="_blank">
       <img src="https://img.shields.io/github/license/hotosm/fmtm-splitter.svg" alt="License">
   </a>
 </p>
@@ -63,32 +63,15 @@ To install fmtm-splitter, you can use pip. Here are two options:
 - Latest on PyPi:
   `pip install fmtm-splitter`
 
-## Using the Container Image
+## Splitting Types
 
-- fmtm-splitter scripts can be used via the pre-built container images.
-- These images come with all dependencies bundled, so are simple to run.
-
-Run a specific command:
-
-```bash
-docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest fmtm-splitter <flags>
-```
-
-Run interactively (to use multiple commands):
-
-```bash
-docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest
-```
-
-> Note: the output directory should always be /data/... to persist data.
-
-## Split By Square
+### Split By Square
 
 The default is to split the polygon into squares. The default
 dimension is 50 meters, but that is configurable. The outer square are
 clipped to the AOI boundary.
 
-## Split By Feature
+### Split By Feature
 
 The split by feature uses highway data extracted from OpenStreetMap,
 and uses it to generate non square task boundaries. It can also be
@@ -97,12 +80,93 @@ size.
 
 ![Split By Feature](https://github.com/hotosm/fmtm-splitter/blob/main/docs/images/Screenshot%20from%202023-08-06%2018-26-34.png)
 
-## Custom SQL query
+### Custom SQL query
 
 It is also possible to supply a custom SQL query to generate the
 tasks.
 
-## The fmtm-splitter program
+## Usage In Code
+
+- Either the FMTMSplitter class can be used directly, or the wrapper/
+  helper functions can be used for splitting.
+
+By square:
+
+```python
+import json
+from fmtm_splitter.splitter import split_by_square
+
+aoi = json.load("/path/to/file.geojson")
+
+split_features = split_by_square(
+    aoi,
+    meters=100,
+)
+```
+
+The FMTM splitter algorithm:
+
+```python
+import json
+from fmtm_splitter.splitter import split_by_sql
+
+aoi = json.load("/path/to/file.geojson")
+osm_extracts = json.load("/path/to/file.geojson")
+db = "postgresql://postgres:postgres@localhost/postgres"
+
+split_features = split_by_sql(
+    aoi,
+    db,
+    num_buildings=50,
+    osm_extract=osm_extracts,
+)
+```
+
+### Database Connections
+
+- The db parameter can be a connection string to start a new connection.
+- Or an existing database connection can be reused.
+- To do this, either the psycopg2 connection, or a SQLAlchemy Session
+  must be passed:
+
+SQLAlchemy example:
+
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from fmtm_splitter.splitter import split_by_sql
+
+# Creates a SQLAlchemy Session object
+engine = create_engine("postgresql://postgres:postgres@localhost/postgres")
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+db = SessionLocal()
+
+# Then pass this object as the db param
+split_features = split_by_sql(
+    aoi,
+    db,
+    num_buildings=50,
+    osm_extract=osm_extracts,
+)
+```
+
+psycopg2 example:
+
+```python
+import psycopg2
+from fmtm_splitter.splitter import split_by_sql
+
+db = psycopg2.connect("postgresql://postgres:postgres@localhost/postgres")
+
+split_features = split_by_sql(
+    aoi,
+    db,
+    num_buildings=50,
+    osm_extract=osm_extracts,
+)
+```
+
+## Usage Via CLI
 
 Options:
 
@@ -131,3 +195,22 @@ fmtm-splitter -v -b AOI -s PG:colorado
 # And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
 # The task splitting defaults to squares, 50 meters across
 ```
+
+### Using the Container Image
+
+- fmtm-splitter scripts can be used via the pre-built container images.
+- These images come with all dependencies bundled, so are simple to run.
+
+Run a specific command:
+
+```bash
+docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest fmtm-splitter <flags>
+```
+
+Run interactively (to use multiple commands):
+
+```bash
+docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest
+```
+
+> Note: the output directory should always be /data/... to persist data.

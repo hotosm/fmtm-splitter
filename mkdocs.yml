@@ -45,6 +45,7 @@ markdown_extensions:
 
 plugins:
   - search
+  - git-revision-date-localized
   - exclude:
       glob:
         - plugins/*
@@ -66,5 +67,7 @@ nav:
   - About: about.md
   - Usage: usage.md
   - API: api.md
-  - License: LICENSE
+  - License: LICENSE.md
+  - Code of Conduct: https://docs.hotosm.org/code-of-conduct
   - Changelog: CHANGELOG.md
+  - Versioning: https://docs.hotosm.org/dev-guide/version-control/#creating-releases

@@ -16,83 +16,177 @@
 #
 """DB models for temporary tables in splitBySQL."""
 import logging
+import warnings
 from typing import Union
-from uuid import uuid4
 
-from geoalchemy2 import Geometry
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-)
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.engine import Engine, create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+import geopandas as gpd
+import psycopg2
+from psycopg2.extensions import register_adapter
+from psycopg2.extras import Json, execute_values, register_uuid
+
+try:
+    import sqlalchemy
+
+    _sqlalchemy_import = True
+except ImportError:
+    _sqlalchemy_import = False
 
 log = logging.getLogger(__name__)
 
 
-def get_engine(db: Union[str, Session]):
-    """Get engine from existing Session, or connection string.
+def create_connection(db: Union[str, psycopg2.extensions.connection]) -> psycopg2.extensions.connection:
+    """Get db connection from existing psycopg2 connection, or URL string.
 
-    If `db` is a connection string, a new engine is generated.
+    Args:
+        db (str, psycopg2.extensions.connection, sqlalchemy.orm.session.Session):
+            string or existing db connection.
+            If `db` is a string, a new connection is generated.
+            If `db` is a psycopg connection, the connection is re-used.
+            If `db` is a sqlalchemy.orm.session.Session object, the connection
+                is also reused.
+
+    Returns:
+        conn: DBAPI connection object to generate cursors from.
     """
-    if isinstance(db, Session):
-        return db.get_bind()
+    # Makes Postgres UUID, JSONB usable, else error
+    register_uuid()
+    register_adapter(dict, Json)
+
+    if isinstance(db, psycopg2.extensions.connection):
+        conn = db
     elif isinstance(db, str):
-        return create_engine(db)
+        conn = psycopg2.connect(db)
+    elif _sqlalchemy_import and isinstance(db, sqlalchemy.orm.session.Session):
+        conn = db.connection().connection
     else:
-        msg = "The `db` variable is not a valid string or Session"
+        msg = "The `db` variable is not a valid string, psycopg connection, " "or SQLAlchemy Session."
         log.error(msg)
         raise ValueError(msg)
 
+    return conn
 
-def new_session(engine: Engine):
-    """Get session using engine.
 
-    Be sure to use in a with statement.
-    with new_session(conn) as session:
-        session.add(xxx)
-        session.commit()
+def close_connection(conn: psycopg2.extensions.connection):
+    """Close the db connection."""
+    # Execute all commands in a transaction before closing
+    try:
+        conn.commit()
+    except Exception as e:
+        log.error(e)
+        log.error("Error committing psycopg2 transaction to db")
+    finally:
+        conn.close()
+
+
+def create_tables(conn: psycopg2.extensions.connection):
+    """Create tables required for splitting.
+
+    Uses a new cursor on existing connection, but not committed directly.
     """
-    return sessionmaker(engine)
+    # First drop tables if they exist
+    drop_tables(conn)
+
+    create_cmd = """
+        CREATE TABLE project_aoi (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            geom GEOMETRY(GEOMETRY, 4326),
+            tags JSONB
+        );
+
+        CREATE TABLE ways_poly (
+            id SERIAL PRIMARY KEY,
+            project_id VARCHAR,
+            osm_id VARCHAR,
+            geom GEOMETRY(GEOMETRY, 4326),
+            tags JSONB
+        );
+
+        CREATE TABLE ways_line (
+            id SERIAL PRIMARY KEY,
+            project_id VARCHAR,
+            osm_id VARCHAR,
+            geom GEOMETRY(GEOMETRY, 4326),
+            tags JSONB
+        );
+    """
+    log.debug("Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'")
+    cur = conn.cursor()
+    cur.execute(create_cmd)
 
 
-class Base(DeclarativeBase):
-    """Wrapper for DeclarativeBase creating all tables."""
+def drop_tables(conn: psycopg2.extensions.connection):
+    """Drop all tables used for splitting.
 
-    pass
-
-
-class DbProjectAOI(Base):
-    """The AOI geometry for a project."""
-
-    __tablename__ = "project_aoi"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    geom = Column(Geometry(geometry_type="GEOMETRY", srid=4326))
-    tags = Column(JSONB)
-
-
-class DbBuildings(Base):
-    """Associated OSM buildings for a project."""
-
-    __tablename__ = "ways_poly"
-
-    id = Column(Integer, primary_key=True)
-    project_id = Column(String)
-    osm_id = Column(String)
-    geom = Column(Geometry(geometry_type="GEOMETRY", srid=4326))
-    tags = Column(JSONB)
+    Uses a new cursor on existing connection, but not committed directly.
+    """
+    drop_cmd = (
+        "DROP VIEW IF EXISTS lines_view;"
+        "DROP TABLE IF EXISTS buildings CASCADE; "
+        "DROP TABLE IF EXISTS clusteredbuildings CASCADE; "
+        "DROP TABLE IF EXISTS dumpedpoints CASCADE; "
+        "DROP TABLE IF EXISTS lowfeaturecountpolygons CASCADE; "
+        "DROP TABLE IF EXISTS voronois CASCADE; "
+        "DROP TABLE IF EXISTS taskpolygons CASCADE; "
+        "DROP TABLE IF EXISTS splitpolygons CASCADE;"
+        "DROP TABLE IF EXISTS project_aoi CASCADE; "
+        "DROP TABLE IF EXISTS ways_poly CASCADE; "
+        "DROP TABLE IF EXISTS ways_line CASCADE;"
+    )
+    log.debug(f"Running tables drop command: {drop_cmd}")
+    cur = conn.cursor()
+    cur.execute(drop_cmd)
 
 
-class DbOsmLines(Base):
-    """Associated OSM ways for a project."""
+def gdf_to_postgis(gdf: gpd.GeoDataFrame, conn: psycopg2.extensions.connection, table_name: str, geom_name: str = "geom") -> None:
+    """Export a GeoDataFrame to the project_aoi table in PostGIS.
 
-    __tablename__ = "ways_line"
+    Built-in geopandas to_wkb uses shapely underneath.
 
-    id = Column(Integer, primary_key=True)
-    project_id = Column(String)
-    osm_id = Column(String)
-    geom = Column(Geometry(geometry_type="GEOMETRY", srid=4326))
-    tags = Column(JSONB)
+    Uses a new cursor on existing connection, but not committed directly.
+
+    Args:
+        gdf (gpd.GeoDataFrame): The GeoDataFrame to export.
+        conn (psycopg2.extensions.connection): The PostgreSQL connection.
+        table_name (str): The name of the table to insert data into.
+        geom_name (str, optional): The name of the geometry column. Defaults to "geom".
+
+    Returns:
+        None
+    """
+    # Only use dataframe copy, else the geom is transformed to WKBElement
+    gdf = gdf.copy()
+
+    # Rename existing geometry column if it doesn't match
+    if geom_name not in gdf.columns:
+        gdf = gdf.rename(columns={gdf.geometry.name: geom_name}).set_geometry(geom_name, crs=gdf.crs)
+
+    log.debug("Converting geodataframe geom to wkb hex string")
+    # Ignore warning 'Geometry column does not contain geometry'
+    warnings.filterwarnings("ignore", category=UserWarning, module="fmtm_splitter.db")
+    gdf[geom_name] = gdf[geom_name].to_wkb(hex=True, include_srid=True)
+    warnings.filterwarnings("default", category=UserWarning, module="fmtm_splitter.db")
+
+    # Build numpy array for db insert
+    tuples = [tuple(x) for x in gdf.to_numpy()]
+    cols = ",".join(list(gdf.columns))
+    query = "INSERT INTO %s(%s) VALUES %%s" % (table_name, cols)
+
+    cur = conn.cursor()
+    execute_values(cur, query, tuples)
+
+
+def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> None:
+    """Insert an OSM geometry into the database.
+
+    Does not commit the values automatically.
+
+    Args:
+        cur (psycopg2.extensions.cursor): The PostgreSQL cursor.
+        table_name (str): The name of the table to insert data into.
+        **kwargs: Keyword arguments representing the values to be inserted.
+
+    Returns:
+        None
+    """
+    query = f"INSERT INTO {table_name}(project_id,geom,osm_id,tags) " "VALUES (%(project_id)s,%(geom)s,%(osm_id)s,%(tags)s)"
+    cur.execute(query, kwargs)
