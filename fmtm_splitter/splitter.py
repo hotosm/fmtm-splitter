@@ -32,8 +32,9 @@ import geopandas as gpd
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
 from psycopg2.extensions import connection
+from shapely import to_geojson
 from shapely.geometry import Polygon, shape
-from shapely.ops import polygonize
+from shapely.ops import polygonize, unary_union
 
 from fmtm_splitter.db import close_connection, create_connection, create_tables, drop_tables, gdf_to_postgis, insert_geom
 
@@ -57,9 +58,9 @@ class FMTMSplitter(object):
         Returns:
             instance (FMTMSplitter): An instance of this class
         """
-        # Parse AOI
+        # Parse AOI, merge if multiple geometries
         if aoi_obj:
-            geojson = self.input_to_geojson(aoi_obj)
+            geojson = self.input_to_geojson(aoi_obj, merge=True)
             self.aoi = self.geojson_to_gdf(geojson)
 
         # Rename fields to match schema & set id field
@@ -70,32 +71,47 @@ class FMTMSplitter(object):
         self.split_features = None
 
     @staticmethod
-    def input_to_geojson(input_data: Union[str, FeatureCollection, dict]) -> GeoJSON:
+    def input_to_geojson(input_data: Union[str, FeatureCollection, dict], merge: bool = False) -> GeoJSON:
         """Parse input data consistently to a GeoJSON obj."""
         log.info(f"Parsing GeoJSON from type {type(input_data)}")
         if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
             # Impose restriction for path lengths <250 chars
             with open(input_data, "r") as jsonfile:
-                return geojson.load(jsonfile)
+                parsed_geojson = geojson.load(jsonfile)
         elif isinstance(input_data, FeatureCollection):
-            return input_data
+            parsed_geojson = input_data
         elif isinstance(input_data, dict):
-            return geojson.loads(geojson.dumps(input_data))
+            parsed_geojson = geojson.loads(geojson.dumps(input_data))
         elif isinstance(input_data, str):
             geojson_truncated = input_data if len(input_data) < 250 else f"{input_data[:250]}..."
             log.debug(f"GeoJSON string passed: {geojson_truncated}")
-            return geojson.loads(input_data)
+            parsed_geojson = geojson.loads(input_data)
         else:
             err = f"The specified AOI is not valid (must be geojson or str): {input_data}"
             log.error(err)
             raise ValueError(err)
 
-    @staticmethod
-    def geojson_to_gdf(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
-        """Parse GeoJSON and return GeoDataFrame.
+        if merge:
+            # If multiple geoms, combine / enclose via convex hull
 
-        The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
-        """
+            features = FMTMSplitter.geojson_to_featcol(parsed_geojson).get("features")
+
+            # If only single geometry present, return
+            if len(features) == 1:
+                return parsed_geojson
+
+            # Convert each feature into a Shapely geometry
+            # Extract from Feature type if necessary
+            geometries = [shape(feature.get("geometry", feature)) for feature in features]
+            log.warning(geometries)
+            merged_geom = unary_union(geometries)
+            return geojson.loads(to_geojson(merged_geom.convex_hull))
+
+        return parsed_geojson
+
+    @staticmethod
+    def geojson_to_featcol(geojson: Union[FeatureCollection, Feature, dict]) -> FeatureCollection:
+        """Standardise any geojson type to FeatureCollection."""
         # Parse and unparse geojson to extract type
         if isinstance(geojson, FeatureCollection):
             # Handle FeatureCollection nesting
@@ -106,7 +122,15 @@ class FMTMSplitter(object):
         else:
             # A standard geometry type. Has coordinates, no properties
             features = [Feature(geometry=geojson)]
+        return FeatureCollection(features)
 
+    @staticmethod
+    def geojson_to_gdf(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
+        """Parse GeoJSON and return GeoDataFrame.
+
+        The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
+        """
+        features = FMTMSplitter.geojson_to_featcol(geojson).get("features")
         log.debug(f"Parsed {len(features)} features")
         log.debug("Converting to geodataframe")
         data = gpd.GeoDataFrame(features, crs="EPSG:4326")
