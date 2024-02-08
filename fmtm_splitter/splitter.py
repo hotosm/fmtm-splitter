@@ -30,7 +30,7 @@ import geojson
 # TODO refactor out geopandas
 import geopandas as gpd
 import numpy as np
-from geojson import Feature, FeatureCollection
+from geojson import Feature, FeatureCollection, GeoJSON
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize
@@ -46,7 +46,7 @@ class FMTMSplitter(object):
 
     def __init__(
         self,
-        aoi_obj: Union[str, FeatureCollection],
+        aoi_obj: Optional[Union[str, FeatureCollection, dict]] = None,
     ):
         """This class splits a polygon into tasks using a variety of algorithms.
 
@@ -58,26 +58,9 @@ class FMTMSplitter(object):
             instance (FMTMSplitter): An instance of this class
         """
         # Parse AOI
-        log.info(f"Parsing GeoJSON from type {type(aoi_obj)}")
-        if isinstance(aoi_obj, str) and len(aoi_obj) < 250 and Path(aoi_obj).is_file():
-            # Impose restriction for path lengths <250 chars
-            with open(aoi_obj, "r") as jsonfile:
-                geojson_dict = geojson.load(jsonfile)
-            self.aoi = self.parse_geojson(geojson_dict)
-        elif isinstance(aoi_obj, FeatureCollection):
-            self.aoi = self.parse_geojson(aoi_obj)
-        elif isinstance(aoi_obj, dict):
-            geojson_dict = geojson.loads(geojson.dumps(aoi_obj))
-            self.aoi = self.parse_geojson(geojson_dict)
-        elif isinstance(aoi_obj, str):
-            geojson_truncated = aoi_obj if len(aoi_obj) < 250 else f"{aoi_obj[:250]}..."
-            log.debug(f"GeoJSON string passed: {geojson_truncated}")
-            geojson_dict = geojson.loads(aoi_obj)
-            self.aoi = self.parse_geojson(geojson_dict)
-        else:
-            err = f"The specified AOI is not valid (must be geojson or str): {aoi_obj}"
-            log.error(err)
-            raise ValueError(err)
+        if aoi_obj:
+            geojson = self.input_to_geojson(aoi_obj)
+            self.aoi = self.geojson_to_gdf(geojson)
 
         # Rename fields to match schema & set id field
         self.id = uuid4()
@@ -87,7 +70,28 @@ class FMTMSplitter(object):
         self.split_features = None
 
     @staticmethod
-    def parse_geojson(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
+    def input_to_geojson(input_data: Union[str, FeatureCollection, dict]) -> GeoJSON:
+        """Parse input data consistently to a GeoJSON obj."""
+        log.info(f"Parsing GeoJSON from type {type(input_data)}")
+        if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
+            # Impose restriction for path lengths <250 chars
+            with open(input_data, "r") as jsonfile:
+                return geojson.load(jsonfile)
+        elif isinstance(input_data, FeatureCollection):
+            return input_data
+        elif isinstance(input_data, dict):
+            return geojson.loads(geojson.dumps(input_data))
+        elif isinstance(input_data, str):
+            geojson_truncated = input_data if len(input_data) < 250 else f"{input_data[:250]}..."
+            log.debug(f"GeoJSON string passed: {geojson_truncated}")
+            return geojson.loads(input_data)
+        else:
+            err = f"The specified AOI is not valid (must be geojson or str): {input_data}"
+            log.error(err)
+            raise ValueError(err)
+
+    @staticmethod
+    def geojson_to_gdf(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
         """Parse GeoJSON and return GeoDataFrame.
 
         The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
@@ -398,7 +402,7 @@ def split_by_sql(
     extract_geojson = None
     # Extracts and parse extract geojson
     if osm_extract:
-        extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
+        extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
     if not extract_geojson:
         err = "A valid data extract must be provided."
         log.error(err)
@@ -480,7 +484,7 @@ def split_by_features(
 
     # Features from geojson
     if geojson_input:
-        input_features = geojson.loads(FMTMSplitter(geojson_input).aoi.to_json())
+        input_features = FMTMSplitter.input_to_geojson(geojson_input)
 
     if not isinstance(input_features, FeatureCollection):
         msg = (
