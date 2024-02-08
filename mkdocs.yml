@@ -67,6 +67,7 @@ nav:
   - About: about.md
   - Usage: usage.md
   - API: api.md
+  - Testing Visually: testing-visually.md
   - License: LICENSE.md
   - Code of Conduct: https://docs.hotosm.org/code-of-conduct
   - Changelog: CHANGELOG.md
