@@ -49,7 +49,7 @@ def test_init_splitter_types(aoi_json):
     FMTMSplitter(polygon)
     # FeatureCollection multiple geoms (4 polygons)
     splitter = FMTMSplitter("tests/testdata/kathmandu_split.geojson")
-    assert len(splitter.aoi) == 4
+    assert len(splitter.aoi) == 1
 
 
 def test_split_by_square_with_dict(aoi_json):
@@ -104,6 +104,15 @@ def test_split_by_square_with_file_output():
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
     assert len(output_geojson.get("features")) == 54
+
+
+def test_split_by_square_with_multigeom_input(aoi_multi_json):
+    """Test divide by square from geojson dict types."""
+    features = split_by_square(
+        aoi_multi_json,
+        meters=50,
+    )
+    assert len(features.get("features")) == 54
 
 
 def test_split_by_features_geojson(aoi_json):

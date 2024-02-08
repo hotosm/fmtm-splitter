@@ -17,12 +17,23 @@
 #
 """Configuration and fixtures for PyTest."""
 
+import json
 import logging
+import sys
 from pathlib import Path
 
 import geojson
 import psycopg2
 import pytest
+from shapely import to_geojson
+from shapely.geometry import box, shape
+
+logging.basicConfig(
+    level="DEBUG",
+    format=("%(asctime)s.%(msecs)03d [%(levelname)s] " "%(name)s | %(funcName)s:%(lineno)d | %(message)s"),
+    datefmt="%y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +50,40 @@ def aoi_json():
     path = Path(__file__).parent / "testdata" / "kathmandu.geojson"
     with open(path, "r") as jsonfile:
         return geojson.load(jsonfile)
+
+
+@pytest.fixture(scope="session")
+def aoi_multi_json():
+    """Dummy AOI GeoJSON, composed of multiple geometries.
+
+    This takes the standard kathmandu AOI, splits into 4 equal squares.
+    The result when merged should equal the original AOI.
+    """
+    path = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    with open(path, "r") as jsonfile:
+        parsed_geojson = geojson.load(jsonfile)
+    single_polygon = shape(parsed_geojson.get("features")[0].get("geometry"))
+    bbox = single_polygon.bounds
+
+    # Divide the bounding box into four equal squares
+    minx, miny, maxx, maxy = bbox
+    width = (maxx - minx) / 2
+    height = (maxy - miny) / 2
+
+    squares = []
+    for i in range(2):
+        for j in range(2):
+            # Calculate coordinates for each square
+            square_minx = minx + i * width
+            square_miny = miny + j * height
+            square_maxx = minx + (i + 1) * width
+            square_maxy = miny + (j + 1) * height
+
+            # Create Polygon for each square
+            square_geojson = json.loads(to_geojson(box(square_minx, square_miny, square_maxx, square_maxy)))
+            squares.append(square_geojson)
+
+    return geojson.FeatureCollection(squares)
 
 
 @pytest.fixture(scope="session")
