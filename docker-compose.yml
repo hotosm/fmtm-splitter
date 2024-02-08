@@ -32,6 +32,8 @@ services:
       - ./fmtm_splitter:/root/.local/lib/python3.10/site-packages/fmtm_splitter
       # Mount local tests
       - ./tests:/data/tests
+      # For output data
+      - ./output:/data/output
     depends_on:
       db:
         condition: service_healthy
