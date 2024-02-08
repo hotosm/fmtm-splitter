@@ -566,32 +566,30 @@ be either the data extract used by the XLSForm, or a postgresql database.
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
     parser.add_argument("-c", "--custom", help="Custom SQL query for database")
-    parser.add_argument("-db", "--dburl", help="The database url string to custom sql")
+    parser.add_argument(
+        "-db", "--dburl", default="postgresql://fmtm:dummycipassword@db:5432/splitter", help="The database url string to custom sql"
+    )
     parser.add_argument("-e", "--extract", help="The OSM data extract for fmtm splitter")
 
     # Accept command line args, or func params
     args = parser.parse_args(args_list)
     if not any(vars(args).values()):
         parser.print_help()
-        quit()
+        return
+
+    # Set logger
+    logging.basicConfig(
+        level="DEBUG" if args.verbose else "INFO",
+        format=("%(asctime)s.%(msecs)03d [%(levelname)s] " "%(name)s | %(funcName)s:%(lineno)d | %(message)s"),
+        datefmt="%y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+    )
 
     # Parse AOI file or string
     if not args.boundary:
         err = "You need to specify an AOI! (file or geojson string)"
         log.error(err)
         raise ValueError(err)
-
-    # if verbose, dump to the terminal.
-    formatter = logging.Formatter("%(threadName)10s - %(name)s - %(levelname)s - %(message)s")
-    level = logging.DEBUG
-    if args.verbose:
-        log.setLevel(level)
-    else:
-        log.setLevel(logging.INFO)
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(level)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
 
     if args.meters:
         split_by_square(
@@ -622,6 +620,11 @@ be either the data extract used by the XLSForm, or a postgresql database.
             db_table=args.source[:3],
             outfile=args.outfile,
         )
+
+    else:
+        log.warning("Not enough arguments passed")
+        parser.print_help()
+        return
 
 
 if __name__ == "__main__":
