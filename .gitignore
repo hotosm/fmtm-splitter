@@ -65,3 +65,6 @@ dist
 # Docs
 site
 .cache
+
+# Data output
+output
