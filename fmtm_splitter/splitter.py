@@ -30,10 +30,11 @@ import geojson
 # TODO refactor out geopandas
 import geopandas as gpd
 import numpy as np
-from geojson import Feature, FeatureCollection
+from geojson import Feature, FeatureCollection, GeoJSON
 from psycopg2.extensions import connection
+from shapely import to_geojson
 from shapely.geometry import Polygon, shape
-from shapely.ops import polygonize
+from shapely.ops import polygonize, unary_union
 
 from fmtm_splitter.db import close_connection, create_connection, create_tables, drop_tables, gdf_to_postgis, insert_geom
 
@@ -46,7 +47,7 @@ class FMTMSplitter(object):
 
     def __init__(
         self,
-        aoi_obj: Union[str, FeatureCollection],
+        aoi_obj: Optional[Union[str, FeatureCollection, dict]] = None,
     ):
         """This class splits a polygon into tasks using a variety of algorithms.
 
@@ -57,27 +58,10 @@ class FMTMSplitter(object):
         Returns:
             instance (FMTMSplitter): An instance of this class
         """
-        # Parse AOI
-        log.info(f"Parsing GeoJSON from type {type(aoi_obj)}")
-        if isinstance(aoi_obj, str) and len(aoi_obj) < 250 and Path(aoi_obj).is_file():
-            # Impose restriction for path lengths <250 chars
-            with open(aoi_obj, "r") as jsonfile:
-                geojson_dict = geojson.load(jsonfile)
-            self.aoi = self.parse_geojson(geojson_dict)
-        elif isinstance(aoi_obj, FeatureCollection):
-            self.aoi = self.parse_geojson(aoi_obj)
-        elif isinstance(aoi_obj, dict):
-            geojson_dict = geojson.loads(geojson.dumps(aoi_obj))
-            self.aoi = self.parse_geojson(geojson_dict)
-        elif isinstance(aoi_obj, str):
-            geojson_truncated = aoi_obj if len(aoi_obj) < 250 else f"{aoi_obj[:250]}..."
-            log.debug(f"GeoJSON string passed: {geojson_truncated}")
-            geojson_dict = geojson.loads(aoi_obj)
-            self.aoi = self.parse_geojson(geojson_dict)
-        else:
-            err = f"The specified AOI is not valid (must be geojson or str): {aoi_obj}"
-            log.error(err)
-            raise ValueError(err)
+        # Parse AOI, merge if multiple geometries
+        if aoi_obj:
+            geojson = self.input_to_geojson(aoi_obj, merge=True)
+            self.aoi = self.geojson_to_gdf(geojson)
 
         # Rename fields to match schema & set id field
         self.id = uuid4()
@@ -87,11 +71,47 @@ class FMTMSplitter(object):
         self.split_features = None
 
     @staticmethod
-    def parse_geojson(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
-        """Parse GeoJSON and return GeoDataFrame.
+    def input_to_geojson(input_data: Union[str, FeatureCollection, dict], merge: bool = False) -> GeoJSON:
+        """Parse input data consistently to a GeoJSON obj."""
+        log.info(f"Parsing GeoJSON from type {type(input_data)}")
+        if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
+            # Impose restriction for path lengths <250 chars
+            with open(input_data, "r") as jsonfile:
+                parsed_geojson = geojson.load(jsonfile)
+        elif isinstance(input_data, FeatureCollection):
+            parsed_geojson = input_data
+        elif isinstance(input_data, dict):
+            parsed_geojson = geojson.loads(geojson.dumps(input_data))
+        elif isinstance(input_data, str):
+            geojson_truncated = input_data if len(input_data) < 250 else f"{input_data[:250]}..."
+            log.debug(f"GeoJSON string passed: {geojson_truncated}")
+            parsed_geojson = geojson.loads(input_data)
+        else:
+            err = f"The specified AOI is not valid (must be geojson or str): {input_data}"
+            log.error(err)
+            raise ValueError(err)
 
-        The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
-        """
+        if merge:
+            # If multiple geoms, combine / enclose via convex hull
+
+            features = FMTMSplitter.geojson_to_featcol(parsed_geojson).get("features")
+
+            # If only single geometry present, return
+            if len(features) == 1:
+                return parsed_geojson
+
+            # Convert each feature into a Shapely geometry
+            # Extract from Feature type if necessary
+            geometries = [shape(feature.get("geometry", feature)) for feature in features]
+            log.warning(geometries)
+            merged_geom = unary_union(geometries)
+            return geojson.loads(to_geojson(merged_geom.convex_hull))
+
+        return parsed_geojson
+
+    @staticmethod
+    def geojson_to_featcol(geojson: Union[FeatureCollection, Feature, dict]) -> FeatureCollection:
+        """Standardise any geojson type to FeatureCollection."""
         # Parse and unparse geojson to extract type
         if isinstance(geojson, FeatureCollection):
             # Handle FeatureCollection nesting
@@ -102,7 +122,15 @@ class FMTMSplitter(object):
         else:
             # A standard geometry type. Has coordinates, no properties
             features = [Feature(geometry=geojson)]
+        return FeatureCollection(features)
 
+    @staticmethod
+    def geojson_to_gdf(geojson: Union[FeatureCollection, Feature, dict]) -> gpd.GeoDataFrame:
+        """Parse GeoJSON and return GeoDataFrame.
+
+        The GeoJSON may be of type FeatureCollection, Feature, or Geometry.
+        """
+        features = FMTMSplitter.geojson_to_featcol(geojson).get("features")
         log.debug(f"Parsed {len(features)} features")
         log.debug("Converting to geodataframe")
         data = gpd.GeoDataFrame(features, crs="EPSG:4326")
@@ -398,7 +426,7 @@ def split_by_sql(
     extract_geojson = None
     # Extracts and parse extract geojson
     if osm_extract:
-        extract_geojson = geojson.loads(FMTMSplitter(osm_extract).aoi.to_json())
+        extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
     if not extract_geojson:
         err = "A valid data extract must be provided."
         log.error(err)
@@ -480,7 +508,7 @@ def split_by_features(
 
     # Features from geojson
     if geojson_input:
-        input_features = geojson.loads(FMTMSplitter(geojson_input).aoi.to_json())
+        input_features = FMTMSplitter.input_to_geojson(geojson_input)
 
     if not isinstance(input_features, FeatureCollection):
         msg = (
@@ -538,32 +566,30 @@ be either the data extract used by the XLSForm, or a postgresql database.
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
     parser.add_argument("-c", "--custom", help="Custom SQL query for database")
-    parser.add_argument("-db", "--dburl", help="The database url string to custom sql")
+    parser.add_argument(
+        "-db", "--dburl", default="postgresql://fmtm:dummycipassword@db:5432/splitter", help="The database url string to custom sql"
+    )
     parser.add_argument("-e", "--extract", help="The OSM data extract for fmtm splitter")
 
     # Accept command line args, or func params
     args = parser.parse_args(args_list)
     if not any(vars(args).values()):
         parser.print_help()
-        quit()
+        return
+
+    # Set logger
+    logging.basicConfig(
+        level="DEBUG" if args.verbose else "INFO",
+        format=("%(asctime)s.%(msecs)03d [%(levelname)s] " "%(name)s | %(funcName)s:%(lineno)d | %(message)s"),
+        datefmt="%y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+    )
 
     # Parse AOI file or string
     if not args.boundary:
         err = "You need to specify an AOI! (file or geojson string)"
         log.error(err)
         raise ValueError(err)
-
-    # if verbose, dump to the terminal.
-    formatter = logging.Formatter("%(threadName)10s - %(name)s - %(levelname)s - %(message)s")
-    level = logging.DEBUG
-    if args.verbose:
-        log.setLevel(level)
-    else:
-        log.setLevel(logging.INFO)
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(level)
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
 
     if args.meters:
         split_by_square(
@@ -594,6 +620,11 @@ be either the data extract used by the XLSForm, or a postgresql database.
             db_table=args.source[:3],
             outfile=args.outfile,
         )
+
+    else:
+        log.warning("Not enough arguments passed")
+        parser.print_help()
+        return
 
 
 if __name__ == "__main__":

@@ -200,17 +200,21 @@ fmtm-splitter -v -b AOI -s PG:colorado
 
 - fmtm-splitter scripts can be used via the pre-built container images.
 - These images come with all dependencies bundled, so are simple to run.
+- They do however require a database, to in this case we use docker compose.
 
 Run a specific command:
 
 ```bash
-docker run --rm -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest fmtm-splitter <flags>
+docker compose run --rm splitter fmtm-splitter <flags>
 ```
 
 Run interactively (to use multiple commands):
 
 ```bash
-docker run --rm -it -v $PWD:/data ghcr.io/hotosm/fmtm-splitter:latest
+docker compose run -it splitter bash
+
+fmtm-splitter
 ```
 
-> Note: the output directory should always be /data/... to persist data.
+> Note: the `output` directory in this repo is mounted in the container
+> to `/data/output`. To persist data, input and output should be placed here.

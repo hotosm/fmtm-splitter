@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 1.1.0 (2024-02-08)
+
+### Feat
+
+- parse multigeom aois with convex hull
+
+### Fix
+
+- command line usage of split by sql algo
+
+### Refactor
+
+- replace data extract parsing with staticmethod
+
 ## 1.0.0 (2024-01-30)
 
 ### Fix
