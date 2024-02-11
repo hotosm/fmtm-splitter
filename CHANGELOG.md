@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.1.1 (2024-02-11)
+
+### Fix
+
+- allow for automatic data extract generation
+- more flexible parsing of aoi for split_by_sql
+
 ## 1.1.0 (2024-02-08)
 
 ### Feat
