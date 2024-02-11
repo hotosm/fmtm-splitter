@@ -423,7 +423,9 @@ def split_by_sql(
     with open(sql_file, "r") as sql:
         query = sql.read()
 
-    extract_geojson = None
+    # Parse AOI
+    parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
+
     # Extracts and parse extract geojson
     if osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
@@ -433,10 +435,10 @@ def split_by_sql(
         raise ValueError(err)
 
     # Handle multiple geometries passed
-    if isinstance(aoi, FeatureCollection):
+    if isinstance(parsed_aoi, FeatureCollection):
         # FIXME why does only one geom split during test?
         # FIXME other geoms return None during splitting
-        if len(feat_array := aoi.get("features", [])) > 1:
+        if len(feat_array := parsed_aoi.get("features", [])) > 1:
             split_geoms = []
             for feat in feat_array:
                 splitter = FMTMSplitter(feat)
@@ -455,7 +457,7 @@ def split_by_sql(
             # Parse FeatCols into single FeatCol
             return FeatureCollection(split_geoms)
 
-    splitter = FMTMSplitter(aoi)
+    splitter = FMTMSplitter(parsed_aoi)
     split_geoms = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
     if not split_geoms:
         msg = "Failed to generate split features."
