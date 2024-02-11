@@ -21,6 +21,7 @@ import argparse
 import json
 import logging
 import sys
+from io import BytesIO
 from pathlib import Path
 from typing import Optional, Union
 from uuid import uuid4
@@ -31,6 +32,7 @@ import geojson
 import geopandas as gpd
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
+from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely import to_geojson
 from shapely.geometry import Polygon, shape
@@ -377,8 +379,8 @@ def split_by_sql(
     db: Union[str, connection],
     sql_file: str = None,
     num_buildings: int = None,
-    osm_extract: Union[str, FeatureCollection] = None,
     outfile: str = None,
+    osm_extract: Optional[Union[str, FeatureCollection]] = None,
 ) -> FeatureCollection:
     """Split an AOI with a custom SQL query or default FMTM query.
 
@@ -404,9 +406,12 @@ def split_by_sql(
         sql_file(str): Path to custom splitting algorithm.
         num_buildings(str): The number of buildings to optimise the FMTM
             splitting algorithm with (approx buildings per generated feature).
+        outfile(str): Output to a GeoJSON file on disk.
         osm_extract (str, FeatureCollection): an OSM extract geojson,
             containing building polygons, or linestrings.
-        outfile(str): Output to a GeoJSON file on disk.
+            Optional param, if not included an extract is generated for you.
+            It is recommended to leave this param as default, unless you know
+            what you are doing.
 
     Returns:
         features (FeatureCollection): A multipolygon of all the task boundaries.
@@ -427,7 +432,25 @@ def split_by_sql(
     parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
 
     # Extracts and parse extract geojson
-    if osm_extract:
+    extract_geojson = None
+    if not osm_extract:
+        # We want all buildings, highways, and waterways for splitting
+        config_data = json.dumps(
+            {"filters": {"tags": {"all_geometry": {"join_or": {"building": [], "highway": [], "waterway": []}}}}}
+        )
+        # Must be a BytesIO JSON object
+        config_bytes = BytesIO(config_data.encode())
+        pg = PostgresClient(
+            "underpass",
+            config_bytes,
+        )
+        extract_geojson = pg.execQuery(
+            parsed_aoi,
+            extra_params={
+                "fileName": "fmtm_splitter",
+            },
+        )
+    elif osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
     if not extract_geojson:
         err = "A valid data extract must be provided."
@@ -605,8 +628,8 @@ be either the data extract used by the XLSForm, or a postgresql database.
             db=args.dburl,
             sql_file=args.custom,
             num_buildings=args.number,
-            osm_extract=args.extract,
             outfile=args.outfile,
+            osm_extract=args.extract,
         )
     # Split by feature using geojson
     elif args.source and args.source[3:] != "PG:":
