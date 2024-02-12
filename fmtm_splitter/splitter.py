@@ -257,7 +257,7 @@ class FMTMSplitter(object):
             tags = properties.get("tags", {})
 
             # Handle nested 'tags' key if present
-            tags = json_str_to_dict(tags.get("tags", tags))
+            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
             osm_id = properties.get("osm_id")
 
             # Common attributes for db tables
