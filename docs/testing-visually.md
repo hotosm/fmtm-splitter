@@ -17,6 +17,8 @@ If you wish to view the split data output in a more visual way:
        --number 50
    ```
 
+   > Note: a data extract will be generated for you.
+
 4. Copy the data from `output/output.geojson` to geojson.io to visualise.
 
 ## Option 2: FMTM
