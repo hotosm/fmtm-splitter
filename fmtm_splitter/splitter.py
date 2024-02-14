@@ -32,13 +32,13 @@ import geojson
 import geopandas as gpd
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
-from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely import to_geojson
 from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize, unary_union
 
 from fmtm_splitter.db import close_connection, create_connection, create_tables, drop_tables, gdf_to_postgis, insert_geom
+from osm_rawdata.postgres import PostgresClient
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -79,7 +79,11 @@ class FMTMSplitter(object):
         if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
             # Impose restriction for path lengths <250 chars
             with open(input_data, "r") as jsonfile:
-                parsed_geojson = geojson.load(jsonfile)
+                try:
+                    parsed_geojson = geojson.load(jsonfile)
+                except json.decoder.JSONDecodeError as e:
+                    raise IOError(f"File exists, but content is invalid JSON: {input_data}") from e
+
         elif isinstance(input_data, FeatureCollection):
             parsed_geojson = input_data
         elif isinstance(input_data, dict):
