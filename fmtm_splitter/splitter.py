@@ -257,7 +257,12 @@ class FMTMSplitter(object):
             # NOTE must handle format generated from FMTMSplitter __init__
             wkb_element = shape(feature["geometry"]).wkb_hex
             properties = feature.get("properties", {})
-            tags = properties.get("tags", {})
+            if "tags" in properties.keys():
+                # Sometimes tags are placed under tags key
+                tags = properties.get("tags", {})
+            else:
+                # Sometimes tags are directly in properties
+                tags = properties
 
             # Handle nested 'tags' key if present
             tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
@@ -275,9 +280,9 @@ class FMTMSplitter(object):
                 insert_geom(cur, "ways_line", **common_args)
 
         # Use raw sql for view generation & remainder of script
-        log.debug("Creating db view with intersecting highways")
+        log.debug("Creating db view with intersecting polylines")
         # Get aoi as geojson
-        aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
+        aoi_geom = geojson.loads(self.aoi.to_json()).get("features", [{}])[0].get("geometry", {})
         view = (
             "DROP VIEW IF EXISTS lines_view;"
             "CREATE VIEW lines_view AS SELECT "
