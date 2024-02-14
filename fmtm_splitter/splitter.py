@@ -282,7 +282,7 @@ class FMTMSplitter(object):
             "DROP VIEW IF EXISTS lines_view;"
             "CREATE VIEW lines_view AS SELECT "
             "tags,geom FROM ways_line WHERE "
-            "ST_CONTAINS(ST_GeomFromGeoJson(%(geojson_str)s), geom)"
+            "ST_Intersects(ST_GeomFromGeoJson(%(geojson_str)s), geom)"
         )
         cur.execute(view, {"geojson_str": aoi_geom})
         # Close current cursor
