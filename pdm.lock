@@ -5,7 +5,7 @@
 groups = ["default", "docs", "test", "debug", "dev"]
 strategy = ["cross_platform"]
 lock_version = "4.4.1"
-content_hash = "sha256:c8b7603c69d4e5a8cbde39184c833d0ff1ad041d9c97a459a32cb37af6ce748e"
+content_hash = "sha256:00975cfda055401eaf1559aa1b3442a595d3f29098cb9700755cc0cb7e532725"
 
 [[package]]
 name = "argcomplete"
@@ -823,7 +823,7 @@ files = [
 
 [[package]]
 name = "osm-rawdata"
-version = "0.2.1"
+version = "0.2.2"
 requires_python = ">=3.10"
 summary = "Make data extracts from OSM data."
 dependencies = [
@@ -839,8 +839,8 @@ dependencies = [
     "sqlalchemy>=2.0.0",
 ]
 files = [
-    {file = "osm-rawdata-0.2.1.tar.gz", hash = "sha256:7cfdee658b57634c2d7ac7aaefcd6a1c5c8d4268b5f2883720283037e7f113d1"},
-    {file = "osm_rawdata-0.2.1-py3-none-any.whl", hash = "sha256:f4aa4e9fb4984cab89bec9eb4bab3f39710b562075290560a4154a0ecf50eb7b"},
+    {file = "osm-rawdata-0.2.2.tar.gz", hash = "sha256:c037bd49bd954a316eb67ac249dff3ffa68aac34337a2ef38dd0224e4d9f960a"},
+    {file = "osm_rawdata-0.2.2-py3-none-any.whl", hash = "sha256:732347cd5745f7c1dbf00ac98095b625f2b492d3e1da788d43242c900a3103fb"},
 ]
 
 [[package]]
