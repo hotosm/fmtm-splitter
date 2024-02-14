@@ -105,7 +105,6 @@ class FMTMSplitter(object):
             # Convert each feature into a Shapely geometry
             # Extract from Feature type if necessary
             geometries = [shape(feature.get("geometry", feature)) for feature in features]
-            log.warning(geometries)
             merged_geom = unary_union(geometries)
             return geojson.loads(to_geojson(merged_geom.convex_hull))
 
@@ -434,6 +433,8 @@ def split_by_sql(
     # Extracts and parse extract geojson
     extract_geojson = None
     if not osm_extract:
+        # For now we merge all geoms via convex hull
+        merged_aoi = FMTMSplitter.input_to_geojson(parsed_aoi)
         # We want all buildings, highways, and waterways for splitting
         config_data = json.dumps(
             {"filters": {"tags": {"all_geometry": {"join_or": {"building": [], "highway": [], "waterway": []}}}}}
@@ -445,7 +446,7 @@ def split_by_sql(
             config_bytes,
         )
         extract_geojson = pg.execQuery(
-            parsed_aoi,
+            merged_aoi,
             extra_params={
                 "fileName": "fmtm_splitter",
             },
