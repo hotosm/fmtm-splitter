@@ -21,6 +21,9 @@ If you wish to view the split data output in a more visual way:
 
 4. Copy the data from `output/output.geojson` to geojson.io to visualise.
 
+> Note: to include a custom data extract, pass the `--extract` flag
+> point to a geojson file.
+
 ## Option 2: FMTM
 
 1. Setup FMTM:
