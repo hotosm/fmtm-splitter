@@ -469,10 +469,6 @@ def split_by_sql(
                 features = featcol.get("features", [])
                 if features:
                     split_geoms += features
-            if not split_geoms:
-                msg = "Failed to generate split features."
-                log.error(msg)
-                raise ValueError(msg)
             if outfile:
                 with open(outfile, "w") as jsonfile:
                     geojson.dump(split_geoms, jsonfile)
