@@ -13,7 +13,7 @@ jobs:
   pytest:
     uses: hotosm/gh-workflows/.github/workflows/test_compose.yml@1.4.3
     with:
-      image_name: ghcr.io/${{ github.repository }}/backend
+      image_name: ghcr.io/${{ github.repository }}
       tag_override: ${{ github.event_name == 'push' && 'ci' || '' }}
       compose_service: splitter
       compose_command: pytest
