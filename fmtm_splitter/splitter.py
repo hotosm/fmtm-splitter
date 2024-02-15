@@ -446,7 +446,8 @@ def split_by_sql(
         # For now we merge all geoms via convex hull
         merged_aoi = FMTMSplitter.input_to_geojson(parsed_aoi)
 
-        # We want all buildings, highways, and waterways for splitting
+        # We want all polylines for splitting:
+        # buildings, highways, waterways, railways
         config_data = dedent(
             """
             select: null
@@ -459,6 +460,7 @@ def split_by_sql(
                 - building: not null
                   highway: not null
                   waterway: not null
+                  railway: not null
         """
         )
         # Must be a BytesIO JSON object
