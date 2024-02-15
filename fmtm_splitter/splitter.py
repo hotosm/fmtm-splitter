@@ -450,7 +450,7 @@ def split_by_sql(
         # buildings, highways, waterways, railways
         config_data = dedent(
             """
-            select: null
+            select:
             from:
               - nodes
               - ways_poly
@@ -461,6 +461,7 @@ def split_by_sql(
                   highway: not null
                   waterway: not null
                   railway: not null
+                  aeroway: not null
         """
         )
         # Must be a BytesIO JSON object
