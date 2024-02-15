@@ -44,7 +44,7 @@ pythonpath = "fmtm_splitter"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.1.1"
+version = "1.1.2"
 version_files = [
     "pyproject.toml:version",
     "fmtm_splitter/__version__.py",
