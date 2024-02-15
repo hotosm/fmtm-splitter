@@ -23,6 +23,7 @@ import logging
 import sys
 from io import BytesIO
 from pathlib import Path
+from textwrap import dedent
 from typing import Optional, Union
 from uuid import uuid4
 
@@ -444,12 +445,25 @@ def split_by_sql(
     if not osm_extract:
         # For now we merge all geoms via convex hull
         merged_aoi = FMTMSplitter.input_to_geojson(parsed_aoi)
+
         # We want all buildings, highways, and waterways for splitting
-        config_data = json.dumps(
-            {"filters": {"tags": {"all_geometry": {"join_or": {"building": [], "highway": [], "waterway": []}}}}}
+        config_data = dedent(
+            """
+            select: null
+            from:
+              - nodes
+              - ways_poly
+              - ways_line
+            where:
+              tags:
+                - building: not null
+                  highway: not null
+                  waterway: not null
+        """
         )
         # Must be a BytesIO JSON object
         config_bytes = BytesIO(config_data.encode())
+
         pg = PostgresClient(
             "underpass",
             config_bytes,
