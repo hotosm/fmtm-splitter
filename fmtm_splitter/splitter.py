@@ -473,10 +473,9 @@ def split_by_sql(
         )
         extract_geojson = pg.execQuery(
             merged_aoi,
-            extra_params={
-                "fileName": "fmtm_splitter",
-            },
+            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
         )
+
     elif osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
     if not extract_geojson:
