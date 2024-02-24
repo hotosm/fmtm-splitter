@@ -42,8 +42,6 @@ repos:
             --ignore,
             CHANGELOG.md,
             --ignore,
-            LICENSE.md,
-            --ignore,
             postgis_snippets/**/*.md,
             --ignore,
             fmtm_splitter/fmtm-splitter_osm_buildings/*.md,
