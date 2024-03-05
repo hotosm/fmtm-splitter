@@ -23,13 +23,14 @@ networks:
 
 services:
   splitter:
-    image: "ghcr.io/hotosm/fmtm-splitter:ci"
+    image: "ghcr.io/hotosm/fmtm-splitter:${TAG_OVERRIDE:-ci}"
     build:
       target: ci
     container_name: fmtm-splitter
     volumes:
       # Mount local package
-      - ./fmtm_splitter:/root/.local/lib/python3.10/site-packages/fmtm_splitter
+      - ./fmtm_splitter:/usr/local/lib/python3.10/site-packages/fmtm_splitter
+      # - ../osm-rawdata/osm_rawdata:/usr/local/lib/python3.10/site-packages/osm_rawdata
       # Mount local tests
       - ./tests:/data/tests
       # For output data

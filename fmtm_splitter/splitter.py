@@ -21,7 +21,9 @@ import argparse
 import json
 import logging
 import sys
+from io import BytesIO
 from pathlib import Path
+from textwrap import dedent
 from typing import Optional, Union
 from uuid import uuid4
 
@@ -37,6 +39,7 @@ from shapely.geometry import Polygon, shape
 from shapely.ops import polygonize, unary_union
 
 from fmtm_splitter.db import close_connection, create_connection, create_tables, drop_tables, gdf_to_postgis, insert_geom
+from osm_rawdata.postgres import PostgresClient
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -77,7 +80,11 @@ class FMTMSplitter(object):
         if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
             # Impose restriction for path lengths <250 chars
             with open(input_data, "r") as jsonfile:
-                parsed_geojson = geojson.load(jsonfile)
+                try:
+                    parsed_geojson = geojson.load(jsonfile)
+                except json.decoder.JSONDecodeError as e:
+                    raise IOError(f"File exists, but content is invalid JSON: {input_data}") from e
+
         elif isinstance(input_data, FeatureCollection):
             parsed_geojson = input_data
         elif isinstance(input_data, dict):
@@ -103,7 +110,6 @@ class FMTMSplitter(object):
             # Convert each feature into a Shapely geometry
             # Extract from Feature type if necessary
             geometries = [shape(feature.get("geometry", feature)) for feature in features]
-            log.warning(geometries)
             merged_geom = unary_union(geometries)
             return geojson.loads(to_geojson(merged_geom.convex_hull))
 
@@ -252,10 +258,15 @@ class FMTMSplitter(object):
             # NOTE must handle format generated from FMTMSplitter __init__
             wkb_element = shape(feature["geometry"]).wkb_hex
             properties = feature.get("properties", {})
-            tags = properties.get("tags", {})
+            if "tags" in properties.keys():
+                # Sometimes tags are placed under tags key
+                tags = properties.get("tags", {})
+            else:
+                # Sometimes tags are directly in properties
+                tags = properties
 
             # Handle nested 'tags' key if present
-            tags = json_str_to_dict(tags.get("tags", tags))
+            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
             osm_id = properties.get("osm_id")
 
             # Common attributes for db tables
@@ -270,14 +281,14 @@ class FMTMSplitter(object):
                 insert_geom(cur, "ways_line", **common_args)
 
         # Use raw sql for view generation & remainder of script
-        log.debug("Creating db view with intersecting highways")
+        log.debug("Creating db view with intersecting polylines")
         # Get aoi as geojson
-        aoi_geom = geojson.loads(self.aoi.to_json())["features"][0]["geometry"]
+        aoi_geom = geojson.loads(self.aoi.to_json()).get("features", [{}])[0].get("geometry", {})
         view = (
             "DROP VIEW IF EXISTS lines_view;"
             "CREATE VIEW lines_view AS SELECT "
             "tags,geom FROM ways_line WHERE "
-            "ST_CONTAINS(ST_GeomFromGeoJson(%(geojson_str)s), geom)"
+            "ST_Intersects(ST_GeomFromGeoJson(%(geojson_str)s), geom)"
         )
         cur.execute(view, {"geojson_str": aoi_geom})
         # Close current cursor
@@ -377,8 +388,8 @@ def split_by_sql(
     db: Union[str, connection],
     sql_file: str = None,
     num_buildings: int = None,
-    osm_extract: Union[str, FeatureCollection] = None,
     outfile: str = None,
+    osm_extract: Optional[Union[str, FeatureCollection]] = None,
 ) -> FeatureCollection:
     """Split an AOI with a custom SQL query or default FMTM query.
 
@@ -404,9 +415,12 @@ def split_by_sql(
         sql_file(str): Path to custom splitting algorithm.
         num_buildings(str): The number of buildings to optimise the FMTM
             splitting algorithm with (approx buildings per generated feature).
+        outfile(str): Output to a GeoJSON file on disk.
         osm_extract (str, FeatureCollection): an OSM extract geojson,
             containing building polygons, or linestrings.
-        outfile(str): Output to a GeoJSON file on disk.
+            Optional param, if not included an extract is generated for you.
+            It is recommended to leave this param as default, unless you know
+            what you are doing.
 
     Returns:
         features (FeatureCollection): A multipolygon of all the task boundaries.
@@ -423,9 +437,46 @@ def split_by_sql(
     with open(sql_file, "r") as sql:
         query = sql.read()
 
-    extract_geojson = None
+    # Parse AOI
+    parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
+
     # Extracts and parse extract geojson
-    if osm_extract:
+    extract_geojson = None
+    if not osm_extract:
+        # For now we merge all geoms via convex hull
+        merged_aoi = FMTMSplitter.input_to_geojson(parsed_aoi)
+
+        # We want all polylines for splitting:
+        # buildings, highways, waterways, railways
+        config_data = dedent(
+            """
+            select:
+            from:
+              - nodes
+              - ways_poly
+              - ways_line
+            where:
+              tags:
+                - building: not null
+                  highway: not null
+                  waterway: not null
+                  railway: not null
+                  aeroway: not null
+        """
+        )
+        # Must be a BytesIO JSON object
+        config_bytes = BytesIO(config_data.encode())
+
+        pg = PostgresClient(
+            "underpass",
+            config_bytes,
+        )
+        extract_geojson = pg.execQuery(
+            merged_aoi,
+            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
+        )
+
+    elif osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
     if not extract_geojson:
         err = "A valid data extract must be provided."
@@ -433,10 +484,10 @@ def split_by_sql(
         raise ValueError(err)
 
     # Handle multiple geometries passed
-    if isinstance(aoi, FeatureCollection):
+    if isinstance(parsed_aoi, FeatureCollection):
         # FIXME why does only one geom split during test?
         # FIXME other geoms return None during splitting
-        if len(feat_array := aoi.get("features", [])) > 1:
+        if len(feat_array := parsed_aoi.get("features", [])) > 1:
             split_geoms = []
             for feat in feat_array:
                 splitter = FMTMSplitter(feat)
@@ -444,10 +495,6 @@ def split_by_sql(
                 features = featcol.get("features", [])
                 if features:
                     split_geoms += features
-            if not split_geoms:
-                msg = "Failed to generate split features."
-                log.error(msg)
-                raise ValueError(msg)
             if outfile:
                 with open(outfile, "w") as jsonfile:
                     geojson.dump(split_geoms, jsonfile)
@@ -455,7 +502,7 @@ def split_by_sql(
             # Parse FeatCols into single FeatCol
             return FeatureCollection(split_geoms)
 
-    splitter = FMTMSplitter(aoi)
+    splitter = FMTMSplitter(parsed_aoi)
     split_geoms = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
     if not split_geoms:
         msg = "Failed to generate split features."
@@ -603,8 +650,8 @@ be either the data extract used by the XLSForm, or a postgresql database.
             db=args.dburl,
             sql_file=args.custom,
             num_buildings=args.number,
-            osm_extract=args.extract,
             outfile=args.outfile,
+            osm_extract=args.extract,
         )
     # Split by feature using geojson
     elif args.source and args.source[3:] != "PG:":

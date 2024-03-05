@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 1.1.2 (2024-02-15)
+
+### Fix
+
+- add useStWithin=False for polyline extracts
+- add aeroway tag for linestring extract generation
+- add railway tag to generated data extracts
+- selecting all geometries if no data extract included
+- more flexible parsing of extract tags
+- update ST_Contains --> ST_Intersects for polylines view
+- improve error handling if json file input invalid
+- merge aoi geoms prior to data extract generation
+- bug parsing geojson tags key if string
+
+### Refactor
+
+- remove ValueError if no geoms generated
+
+## 1.1.1 (2024-02-11)
+
+### Fix
+
+- allow for automatic data extract generation
+- more flexible parsing of aoi for split_by_sql
+
 ## 1.1.0 (2024-02-08)
 
 ### Feat

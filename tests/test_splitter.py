@@ -20,6 +20,7 @@
 import json
 import logging
 from pathlib import Path
+from time import sleep
 from uuid import uuid4
 
 import geojson
@@ -139,7 +140,19 @@ def test_split_by_sql_fmtm(db, aoi_json, extract_json, output_json):
     assert sorted(features) == sorted(output_json)
 
 
-def test_split_by_sql_fmtm_multi_geom(aoi_json, extract_json, output_json):
+def test_split_by_sql_fmtm_no_extract(aoi_json):
+    """Test FMTM splitting algorithm, with no data extract."""
+    features = split_by_sql(
+        aoi_json,
+        # Use separate db connection for longer running test
+        "postgresql://fmtm:dummycipassword@db:5432/splitter",
+        num_buildings=5,
+    )
+    # This may change over time as it calls the live API
+    assert len(features.get("features")) > 120
+
+
+def test_split_by_sql_fmtm_multi_geom(extract_json):
     """Test divide by square from geojson file with multiple geometries."""
     with open("tests/testdata/kathmandu_split.geojson", "r") as jsonfile:
         parsed_featcol = geojson.load(jsonfile)
@@ -153,14 +166,18 @@ def test_split_by_sql_fmtm_multi_geom(aoi_json, extract_json, output_json):
     assert isinstance(features, geojson.feature.FeatureCollection)
     assert isinstance(features.get("features"), list)
     assert isinstance(features.get("features")[0], dict)
-    assert len(features.get("features")) == 11
+    assert len(features.get("features")) == 47
 
-    # This geom has a hole, so is MultiPolygon
-    multipolygon = geojson.loads(json.dumps(features.get("features")[0].get("geometry")))
-    assert isinstance(multipolygon, geojson.geometry.MultiPolygon)
+    multipolygons = [feature for feature in features.get("features", []) if feature.get("geometry").get("type") == "MultiPolygon"]
+    assert len(multipolygons) == 2
 
-    # Then geom is a standard Polygon
-    polygon = geojson.loads(json.dumps(features.get("features")[3].get("geometry")))
+    polygons = [feature for feature in features.get("features", []) if feature.get("geometry").get("type") == "Polygon"]
+    assert len(polygons) == 45
+
+    polygon_feat = geojson.loads(json.dumps(polygons[0]))
+    assert isinstance(polygon_feat, geojson.Feature)
+
+    polygon = geojson.loads(json.dumps(polygons[0].get("geometry")))
     assert isinstance(polygon, geojson.geometry.Polygon)
 
 
@@ -235,3 +252,33 @@ def test_split_by_sql_cli():
         output_geojson = geojson.load(jsonfile)
 
     assert len(output_geojson.get("features")) == 62
+
+
+def test_split_by_sql_cli_no_extract():
+    """Test split by sql works via CLI."""
+    # Sleep 3 seconds before test to ease raw-data-api
+    sleep(3)
+    infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
+
+    try:
+        main(
+            [
+                "--boundary",
+                str(infile),
+                "--dburl",
+                "postgresql://fmtm:dummycipassword@db:5432/splitter",
+                "--number",
+                "10",
+                "--outfile",
+                str(outfile),
+            ]
+        )
+    except SystemExit:
+        pass
+
+    with open(outfile, "r") as geojson_out:
+        output_geojson = geojson.load(geojson_out)
+
+    # This may change over time as it uses the live API
+    assert len(output_geojson.get("features")) > 60
