@@ -24,6 +24,7 @@ from time import sleep
 from uuid import uuid4
 
 import geojson
+import pytest
 
 from fmtm_splitter.splitter import FMTMSplitter, main, split_by_features, split_by_sql, split_by_square
 
@@ -49,8 +50,9 @@ def test_init_splitter_types(aoi_json):
     polygon = feature.get("geometry")
     FMTMSplitter(polygon)
     # FeatureCollection multiple geoms (4 polygons)
-    splitter = FMTMSplitter("tests/testdata/kathmandu_split.geojson")
-    assert len(splitter.aoi) == 1
+    with pytest.raises(ValueError) as error:
+        FMTMSplitter("tests/testdata/kathmandu_split.geojson")
+    assert str(error.value) == "The input AOI cannot contain multiple geometries."
 
 
 def test_split_by_square_with_dict(aoi_json):
@@ -109,11 +111,16 @@ def test_split_by_square_with_file_output():
 
 def test_split_by_square_with_multigeom_input(aoi_multi_json):
     """Test divide by square from geojson dict types."""
+    file_name = uuid4()
+    outfile = Path(__file__).parent.parent / f"{file_name}.geojson"
     features = split_by_square(
         aoi_multi_json,
         meters=50,
+        outfile=str(outfile),
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features", [])) == 60
+    for index in [0, 1, 2, 3]:
+        assert Path(f"{Path(outfile).stem}_{index}.geojson)").exists()
 
 
 def test_split_by_features_geojson(aoi_json):
@@ -128,7 +135,7 @@ def test_split_by_features_geojson(aoi_json):
     assert len(features.get("features")) == 4
 
 
-def test_split_by_sql_fmtm(db, aoi_json, extract_json, output_json):
+def test_split_by_sql_fmtm_with_extract(db, aoi_json, extract_json, output_json):
     """Test divide by square from geojson file."""
     features = split_by_sql(
         aoi_json,
