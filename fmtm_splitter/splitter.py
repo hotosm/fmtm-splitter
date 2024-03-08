@@ -29,12 +29,12 @@ from typing import Optional, Union
 import geojson
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
+from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, box, shape
 from shapely.ops import unary_union
 
 from fmtm_splitter.db import aoi_to_postgis, close_connection, create_connection, create_tables, drop_tables, insert_geom
-from osm_rawdata.postgres import PostgresClient
 
 # Instantiate logger
 log = logging.getLogger(__name__)
