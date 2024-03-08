@@ -16,13 +16,12 @@
 #
 """DB models for temporary tables in splitBySQL."""
 import logging
-import warnings
 from typing import Union
 
-import geopandas as gpd
 import psycopg2
 from psycopg2.extensions import register_adapter
-from psycopg2.extras import Json, execute_values, register_uuid
+from psycopg2.extras import Json, register_uuid
+from shapely.geometry import Polygon
 
 try:
     import sqlalchemy
@@ -89,13 +88,11 @@ def create_tables(conn: psycopg2.extensions.connection):
     create_cmd = """
         CREATE TABLE project_aoi (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-            geom GEOMETRY(GEOMETRY, 4326),
-            tags JSONB
+            geom GEOMETRY(GEOMETRY, 4326)
         );
 
         CREATE TABLE ways_poly (
             id SERIAL PRIMARY KEY,
-            project_id VARCHAR,
             osm_id VARCHAR,
             geom GEOMETRY(GEOMETRY, 4326),
             tags JSONB
@@ -103,7 +100,6 @@ def create_tables(conn: psycopg2.extensions.connection):
 
         CREATE TABLE ways_line (
             id SERIAL PRIMARY KEY,
-            project_id VARCHAR,
             osm_id VARCHAR,
             geom GEOMETRY(GEOMETRY, 4326),
             tags JSONB
@@ -137,42 +133,28 @@ def drop_tables(conn: psycopg2.extensions.connection):
     cur.execute(drop_cmd)
 
 
-def gdf_to_postgis(gdf: gpd.GeoDataFrame, conn: psycopg2.extensions.connection, table_name: str, geom_name: str = "geom") -> None:
+def aoi_to_postgis(conn: psycopg2.extensions.connection, geom: Polygon) -> None:
     """Export a GeoDataFrame to the project_aoi table in PostGIS.
-
-    Built-in geopandas to_wkb uses shapely underneath.
 
     Uses a new cursor on existing connection, but not committed directly.
 
     Args:
-        gdf (gpd.GeoDataFrame): The GeoDataFrame to export.
+        geom (Polygon): The shapely geom to insert.
         conn (psycopg2.extensions.connection): The PostgreSQL connection.
-        table_name (str): The name of the table to insert data into.
-        geom_name (str, optional): The name of the geometry column. Defaults to "geom".
 
     Returns:
         None
     """
-    # Only use dataframe copy, else the geom is transformed to WKBElement
-    gdf = gdf.copy()
+    log.debug("Adding AOI to project_aoi table")
 
-    # Rename existing geometry column if it doesn't match
-    if geom_name not in gdf.columns:
-        gdf = gdf.rename(columns={gdf.geometry.name: geom_name}).set_geometry(geom_name, crs=gdf.crs)
-
-    log.debug("Converting geodataframe geom to wkb hex string")
-    # Ignore warning 'Geometry column does not contain geometry'
-    warnings.filterwarnings("ignore", category=UserWarning, module="fmtm_splitter.db")
-    gdf[geom_name] = gdf[geom_name].to_wkb(hex=True, include_srid=True)
-    warnings.filterwarnings("default", category=UserWarning, module="fmtm_splitter.db")
-
-    # Build numpy array for db insert
-    tuples = [tuple(x) for x in gdf.to_numpy()]
-    cols = ",".join(list(gdf.columns))
-    query = "INSERT INTO %s(%s) VALUES %%s" % (table_name, cols)
+    sql = """
+        INSERT INTO project_aoi (geom)
+        VALUES (ST_SetSRID(CAST(%s AS GEOMETRY), 4326));
+    """
 
     cur = conn.cursor()
-    execute_values(cur, query, tuples)
+    cur.execute(sql, (geom.wkb_hex,))
+    cur.close()
 
 
 def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> None:
@@ -188,5 +170,5 @@ def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> N
     Returns:
         None
     """
-    query = f"INSERT INTO {table_name}(project_id,geom,osm_id,tags) " "VALUES (%(project_id)s,%(geom)s,%(osm_id)s,%(tags)s)"
+    query = f"INSERT INTO {table_name}(geom,osm_id,tags) " "VALUES (%(geom)s,%(osm_id)s,%(tags)s)"
     cur.execute(query, kwargs)
