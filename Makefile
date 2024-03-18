@@ -18,7 +18,7 @@
 
 PACKAGE := org.osm_fieldwork.py
 NAME := fmtm-splitter
-VERSION := 1.1.2
+VERSION := 1.2.0
 
 # All python source files
 # MDS := $(wildcard ./docs/*.md)

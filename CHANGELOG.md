@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.2.0 (2024-03-08)
+
+### Feat
+
+- refactor out geopandas entirely, use shapely
+
 ## 1.1.2 (2024-02-15)
 
 ### Fix

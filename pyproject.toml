@@ -11,7 +11,6 @@ dependencies = [
     "shapely>=1.8.1",
     "psycopg2>=2.9.1",
     "numpy>=1.21.0",
-    "geopandas>=0.11.0",
     "osm-rawdata>=0.2.2",
 ]
 requires-python = ">=3.10"
@@ -44,7 +43,7 @@ pythonpath = "fmtm_splitter"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.1.2"
+version = "1.2.0"
 version_files = [
     "pyproject.toml:version",
     "fmtm_splitter/__version__.py",

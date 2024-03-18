@@ -81,9 +81,9 @@ def aoi_multi_json():
 
             # Create Polygon for each square
             square_geojson = json.loads(to_geojson(box(square_minx, square_miny, square_maxx, square_maxy)))
-            squares.append(square_geojson)
+            squares.append(geojson.Feature(geometry=square_geojson))
 
-    return geojson.FeatureCollection(squares)
+    return geojson.FeatureCollection(features=squares)
 
 
 @pytest.fixture(scope="session")
