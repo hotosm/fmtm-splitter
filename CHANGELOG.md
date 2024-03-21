@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.2.1 (2024-03-21)
+
+### Fix
+
+- clip square grid with AOI
+
 ## 1.2.0 (2024-03-08)
 
 ### Feat
