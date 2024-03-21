@@ -31,7 +31,7 @@ import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
 from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
-from shapely.geometry import Polygon, box, shape
+from shapely.geometry import Polygon, shape
 from shapely.ops import unary_union
 
 from fmtm_splitter.db import aoi_to_postgis, close_connection, create_connection, create_tables, drop_tables, insert_geom
@@ -154,7 +154,10 @@ class FMTMSplitter(object):
         polygons = []
         for x in cols[:-1]:
             for y in rows[:-1]:
-                polygons.append(box(x, y, x + width, y + length))
+                grid_polygon = Polygon([(x, y), (x + width, y), (x + width, y + length), (x, y + length)])
+                clipped_polygon = grid_polygon.intersection(self.aoi)
+                if not clipped_polygon.is_empty:
+                    polygons.append(clipped_polygon)
 
         self.split_features = FeatureCollection([Feature(geometry=poly) for poly in polygons])
         return self.split_features
