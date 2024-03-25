@@ -15,6 +15,7 @@
 #     along with fmtm-splitter.  If not, see <https:#www.gnu.org/licenses/>.
 #
 """DB models for temporary tables in splitBySQL."""
+
 import logging
 from typing import Union
 
