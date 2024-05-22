@@ -73,50 +73,18 @@ BEGIN
             );
     ELSE
         -- Calculate number of buildings per cluster
-        SELECT CAST(COUNT(*) / %(num_buildings)s AS INTEGER) INTO num_buildings FROM ways_poly;
-
         CREATE TABLE polygonsnocount AS (
             WITH aoi AS (
                 SELECT * FROM "project_aoi"
             )
-            ,split_polygons_with_buildings AS (
-                SELECT
-                    row_number() OVER () AS polyid,
-                    ST_ConvexHull(ST_Collect(cluster_geom)) AS geom
-                FROM (
-                    SELECT
-                        CASE
-                            WHEN ST_Within(ST_PointOnSurface(b.geom), a.geom) THEN b.geom
-                            ELSE NULL
-                        END AS cluster_geom,
-                        ST_ClusterKMeans(b.geom, num_buildings) OVER () AS cluster_id
-                    FROM
-                        ways_poly b, aoi a
-                ) AS clustered_buildings
-                GROUP BY
-                    cluster_id
-            )
-            ,buffer_boundary AS (
-                SELECT ST_Buffer(ST_Union(ST_Boundary(geom)), 0) AS geom
-                FROM split_polygons_with_buildings
-            )   
-            ,comb AS (
-                SELECT ST_Union(aoi.geom, buffer_boundary.geom) AS geom
-                FROM aoi, buffer_boundary
-            )
-            ,splitpolysnoindex AS (
-                SELECT (ST_Dump(ST_Polygonize(comb.geom))).geom AS geom
-                FROM comb
-            )
-            -- Add an index column to the split polygons
-            ,splitpolygons AS(
+            ,transformed_aoi AS(
                 SELECT
                 row_number () over () as polyid,
-                ST_Transform(spni.geom,4326)::geography AS geog,
-                spni.geom 
-                from splitpolysnoindex spni
+                ST_Transform(aoi.geom,4326)::geography AS geog,
+                aoi.geom 
+                from aoi
             )
-            SELECT * FROM splitpolygons
+            SELECT * FROM transformed_aoi
         );
     END IF;
 END $$;
