@@ -156,7 +156,7 @@ with lowfeaturecountpolys as (
     select *
     from splitpolygons as p
     -- TODO: feature count should not be hard-coded
-    where p.numfeatures < 20  
+    where p.numfeatures < %(num_buildings)s
 ), 
 -- Find the neighbors of the low-feature-count polygons
 -- Store their ids as n_polyid, numfeatures as n_numfeatures, etc
@@ -284,15 +284,61 @@ USING GIST (geom);
 -- VACUUM ANALYZE voronois;
 DROP TABLE voronoids;
 
+DROP TABLE IF EXISTS unsimplifiedtaskpolygons;
+CREATE TABLE unsimplifiedtaskpolygons AS (
+    SELECT ST_Union(geom) as geom, clusteruid
+    FROM voronois
+    GROUP BY clusteruid
+);
+
+CREATE INDEX unsimplifiedtaskpolygons_idx
+    ON unsimplifiedtaskpolygons
+    USING GIST (geom);
+
+--VACUUM ANALYZE unsimplifiedtaskpolygons;
+
+
+--*****************************Simplify*******************************
+-- Extract unique line segments
 DROP TABLE IF EXISTS taskpolygons;
 CREATE TABLE taskpolygons AS (
-SELECT ST_Union(geom) as geom, clusteruid
-FROM voronois
-GROUP BY clusteruid
+    --Convert task polygon boundaries to linestrings
+    WITH rawlines AS (
+        SELECT utp.clusteruid, st_boundary(utp.geom) AS geom
+        FROM unsimplifiedtaskpolygons AS utp 
+    )
+    -- Union, which eliminates duplicates from adjacent polygon boundaries
+    ,unionlines AS (
+        SELECT st_union(l.geom) AS geom FROM rawlines l
+    )
+    -- Dump, which gives unique segments.
+    ,segments AS (
+        SELECT (st_dump(l.geom)).geom AS geom
+        FROM unionlines l
+    )
+    ,agglomerated AS (
+        SELECT st_linemerge(st_unaryunion(st_collect(s.geom))) AS geom
+        FROM segments s
+    )
+    ,simplifiedlines AS (
+        SELECT st_simplify(a.geom, 0.000075) AS geom
+        FROM agglomerated a
+    )
+    ,taskpolygonsnoindex as (
+        SELECT (st_dump(st_polygonize(s.geom))).geom AS geom
+        FROM simplifiedlines s
+    )
+    SELECT 
+        row_number () over () as taskid,
+        tpni.*
+    FROM taskpolygonsnoindex tpni
 );
+
+-- ALTER TABLE taskpolygons ADD PRIMARY KEY(taskid);
+SELECT Populate_Geometry_Columns('public.taskpolygons'::regclass);
 CREATE INDEX taskpolygons_idx
-ON taskpolygons
-USING GIST (geom);
+    ON taskpolygons
+    USING GIST (geom);
 -- VACUUM ANALYZE taskpolygons;
 
 
