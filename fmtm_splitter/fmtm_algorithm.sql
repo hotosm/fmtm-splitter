@@ -23,22 +23,26 @@ BEGIN
             -- TODO: add waterway polygons; now a beach doesn't show up as a splitline.
             -- TODO: these tags should come from another table rather than hardcoded
             -- so that they're easily configured during project creation.
-            ,splitlines AS (
-                -- SELECT ST_Intersection(a.geom, l.geom) AS geom
-                -- FROM aoi a, "ways_line" l
-                -- WHERE ST_Intersects(a.geom, l.geom)
-                -- -- TODO: these tags should come from a config table
-                -- -- All highways, waterways, and railways
-                -- AND (l.tags->>'highway' IS NOT NULL
-                --   OR l.tags->>'waterway' IS NOT NULL
-                --   OR l.tags->>'railway' IS NOT NULL
-                --   )
-                
-                SELECT * from lines_view l
-                WHERE l.tags->>'highway' IS NOT NULL
-                OR l.tags->>'waterway' IS NOT NULL
-                OR l.tags->>'railway' IS NOT NULL
+            , splitlines AS (
+                SELECT ST_Intersection(a.geom, l.geom) AS geom
+                FROM aoi a
+                JOIN "ways_line" l ON ST_Intersects(a.geom, l.geom)
+                WHERE (
+                    (l.tags->>'highway' IS NOT NULL AND 
+                    l.tags->>'highway' NOT IN ('unclassified', 'residential', 'service', 'pedestrian', 'track', 'bus_guideway')) -- TODO: update(add/remove) this based on the requirements later
+                    OR l.tags->>'waterway' IS NOT NULL
+                    OR l.tags->>'railway' IS NOT NULL
+                )
             )
+                
+            --     SELECT * from lines_view l
+            --    WHERE (
+            --         (l.tags->>'highway' IS NOT NULL AND 
+            --         l.tags->>'highway' NOT IN ('unclassified', 'residential', 'service', 'pedestrian', 'track', 'bus_guideway'))
+            --         OR l.tags->>'waterway' IS NOT NULL
+            --         OR l.tags->>'railway' IS NOT NULL
+            --     )
+            -- )
             -- Merge all lines, necessary so that the polygonize function works later
             ,merged AS (
                 SELECT ST_LineMerge(ST_Union(splitlines.geom)) AS geom
@@ -286,14 +290,14 @@ DROP TABLE voronoids;
 
 DROP TABLE IF EXISTS unsimplifiedtaskpolygons;
 CREATE TABLE unsimplifiedtaskpolygons AS (
-    SELECT ST_Union(geom) as geom, clusteruid
-    FROM voronois
-    GROUP BY clusteruid
+  SELECT ST_Union(geom) as geom, clusteruid
+  FROM voronois
+  GROUP BY clusteruid
 );
 
 CREATE INDEX unsimplifiedtaskpolygons_idx
-    ON unsimplifiedtaskpolygons
-    USING GIST (geom);
+  ON unsimplifiedtaskpolygons
+  USING GIST (geom);
 
 --VACUUM ANALYZE unsimplifiedtaskpolygons;
 
