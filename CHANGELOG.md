@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.2.2 (2024-06-05)
+
+### Refactor
+
+- run sqlfluff and format sql files
+- simplified the boundary of splitted ploygons and removed hardcoded buildings number
+- removed redundant sql
+- updated algorithm to split aoi when no linear features, by clustering
+
 ## 1.2.1 (2024-03-21)
 
 ### Fix
