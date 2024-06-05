@@ -103,6 +103,9 @@ convention = "google"
 
 [tool.sqlfluff.core]
 dialect = "postgres"
+templater = "placeholder"
+[tool.sqlfluff.templater.placeholder]
+param_style = "pyformat"  # For pyformat SQL %(num_buildings)s
 
 [project.scripts]
 fmtm-splitter = "fmtm_splitter.splitter:main"
