@@ -1,67 +1,97 @@
 DROP TABLE IF EXISTS polygonsnocount;
 -- Create a new polygon layer of splits by lines
 
-CREATE TABLE polygonsnocount AS (
--- The Area of Interest provided by the person creating the project
-WITH aoi AS (
-    SELECT * FROM "project_aoi"
-)
--- Extract all lines to be used as splitlines from a table of lines
--- with the schema from Underpass (all tags as jsonb column called 'tags')
--- TODO: add polygons (closed ways in OSM) with a 'highway' tag;
--- some features such as roundabouts appear as polygons.
--- TODO: add waterway polygons; now a beach doesn't show up as a splitline.
--- TODO: these tags should come from another table rather than hardcoded
--- so that they're easily configured during project creation.
-,splitlines AS (
-    -- SELECT ST_Intersection(a.geom, l.geom) AS geom
-    -- FROM aoi a, "ways_line" l
-    -- WHERE ST_Intersects(a.geom, l.geom)
-    -- -- TODO: these tags should come from a config table
-    -- -- All highways, waterways, and railways
-    -- AND (l.tags->>'highway' IS NOT NULL
-    --   OR l.tags->>'waterway' IS NOT NULL
-    --   OR l.tags->>'railway' IS NOT NULL
-    --   )
+DO $$
+DECLARE
+    lines_count INTEGER;
+    num_buildings INTEGER;
+BEGIN
+    -- Check if ways_line has any data
+    SELECT COUNT(*) INTO lines_count FROM ways_line;
+    
+    IF lines_count > 0 THEN
+        CREATE TABLE polygonsnocount AS (
 
-    SELECT * from lines_view l
-    WHERE l.tags->>'highway' IS NOT NULL
-    OR l.tags->>'waterway' IS NOT NULL
-    OR l.tags->>'railway' IS NOT NULL
-
-)
--- Merge all lines, necessary so that the polygonize function works later
-,merged AS (
-    SELECT ST_LineMerge(ST_Union(splitlines.geom)) AS geom
-    FROM splitlines
-)
--- Combine the boundary of the AOI with the splitlines
--- First extract the Area of Interest boundary as a line
-,boundary AS (
-    SELECT ST_Boundary(geom) AS geom
-    FROM aoi
-)
--- Then combine it with the splitlines
-,comb AS (
-    SELECT ST_Union(boundary.geom, merged.geom) AS geom
-    FROM boundary, merged
-)
--- TODO add closed ways from OSM to lines (roundabouts etc)
--- Create a polygon for each area enclosed by the splitlines
-,splitpolysnoindex AS (
-    SELECT (ST_Dump(ST_Polygonize(comb.geom))).geom as geom
-    FROM comb
-)
--- Add an index column to the split polygons
-,splitpolygons AS(
-    SELECT
-    row_number () over () as polyid,
-    ST_Transform(spni.geom,4326)::geography AS geog,
-    spni.* 
-    from splitpolysnoindex spni
-)
-SELECT * FROM splitpolygons
-);
+            -- The Area of Interest provided by the person creating the project
+            WITH aoi AS (
+                SELECT * FROM "project_aoi"
+            )
+            -- Extract all lines to be used as splitlines from a table of lines
+            -- with the schema from Underpass (all tags as jsonb column called 'tags')
+            -- TODO: add polygons (closed ways in OSM) with a 'highway' tag;
+            -- some features such as roundabouts appear as polygons.
+            -- TODO: add waterway polygons; now a beach doesn't show up as a splitline.
+            -- TODO: these tags should come from another table rather than hardcoded
+            -- so that they're easily configured during project creation.
+            , splitlines AS (
+                SELECT ST_Intersection(a.geom, l.geom) AS geom
+                FROM aoi a
+                JOIN "ways_line" l ON ST_Intersects(a.geom, l.geom)
+                WHERE (
+                    (l.tags->>'highway' IS NOT NULL AND 
+                    l.tags->>'highway' NOT IN ('unclassified', 'residential', 'service', 'pedestrian', 'track', 'bus_guideway')) -- TODO: update(add/remove) this based on the requirements later
+                    OR l.tags->>'waterway' IS NOT NULL
+                    OR l.tags->>'railway' IS NOT NULL
+                )
+            )
+                
+            --     SELECT * from lines_view l
+            --    WHERE (
+            --         (l.tags->>'highway' IS NOT NULL AND 
+            --         l.tags->>'highway' NOT IN ('unclassified', 'residential', 'service', 'pedestrian', 'track', 'bus_guideway'))
+            --         OR l.tags->>'waterway' IS NOT NULL
+            --         OR l.tags->>'railway' IS NOT NULL
+            --     )
+            -- )
+            -- Merge all lines, necessary so that the polygonize function works later
+            ,merged AS (
+                SELECT ST_LineMerge(ST_Union(splitlines.geom)) AS geom
+                FROM splitlines
+            )
+            -- Combine the boundary of the AOI with the splitlines
+            -- First extract the Area of Interest boundary as a line
+            ,boundary AS (
+                SELECT ST_Boundary(geom) AS geom
+                FROM aoi
+            )
+            -- Then combine it with the splitlines
+            ,comb AS (
+                SELECT ST_Union(boundary.geom, merged.geom) AS geom
+                FROM boundary, merged
+            )
+            -- TODO add closed ways from OSM to lines (roundabouts etc)
+            -- Create a polygon for each area enclosed by the splitlines
+            ,splitpolysnoindex AS (
+                SELECT (ST_Dump(ST_Polygonize(comb.geom))).geom as geom
+                FROM comb
+            )
+            -- Add an index column to the split polygons
+            ,splitpolygons AS(
+                SELECT
+                row_number () over () as polyid,
+                ST_Transform(spni.geom,4326)::geography AS geog,
+                spni.* 
+                from splitpolysnoindex spni
+            )
+            SELECT * FROM splitpolygons
+            );
+    ELSE
+        -- Calculate number of buildings per cluster
+        CREATE TABLE polygonsnocount AS (
+            WITH aoi AS (
+                SELECT * FROM "project_aoi"
+            )
+            ,transformed_aoi AS(
+                SELECT
+                row_number () over () as polyid,
+                ST_Transform(aoi.geom,4326)::geography AS geog,
+                aoi.geom 
+                from aoi
+            )
+            SELECT * FROM transformed_aoi
+        );
+    END IF;
+END $$;
 
 
 -- Make that index column a primary key
@@ -130,7 +160,7 @@ with lowfeaturecountpolys as (
     select *
     from splitpolygons as p
     -- TODO: feature count should not be hard-coded
-    where p.numfeatures < 20  
+    where p.numfeatures < %(num_buildings)s
 ), 
 -- Find the neighbors of the low-feature-count polygons
 -- Store their ids as n_polyid, numfeatures as n_numfeatures, etc
@@ -258,15 +288,61 @@ USING GIST (geom);
 -- VACUUM ANALYZE voronois;
 DROP TABLE voronoids;
 
+DROP TABLE IF EXISTS unsimplifiedtaskpolygons;
+CREATE TABLE unsimplifiedtaskpolygons AS (
+  SELECT ST_Union(geom) as geom, clusteruid
+  FROM voronois
+  GROUP BY clusteruid
+);
+
+CREATE INDEX unsimplifiedtaskpolygons_idx
+  ON unsimplifiedtaskpolygons
+  USING GIST (geom);
+
+--VACUUM ANALYZE unsimplifiedtaskpolygons;
+
+
+--*****************************Simplify*******************************
+-- Extract unique line segments
 DROP TABLE IF EXISTS taskpolygons;
 CREATE TABLE taskpolygons AS (
-SELECT ST_Union(geom) as geom, clusteruid
-FROM voronois
-GROUP BY clusteruid
+    --Convert task polygon boundaries to linestrings
+    WITH rawlines AS (
+        SELECT utp.clusteruid, st_boundary(utp.geom) AS geom
+        FROM unsimplifiedtaskpolygons AS utp 
+    )
+    -- Union, which eliminates duplicates from adjacent polygon boundaries
+    ,unionlines AS (
+        SELECT st_union(l.geom) AS geom FROM rawlines l
+    )
+    -- Dump, which gives unique segments.
+    ,segments AS (
+        SELECT (st_dump(l.geom)).geom AS geom
+        FROM unionlines l
+    )
+    ,agglomerated AS (
+        SELECT st_linemerge(st_unaryunion(st_collect(s.geom))) AS geom
+        FROM segments s
+    )
+    ,simplifiedlines AS (
+        SELECT st_simplify(a.geom, 0.000075) AS geom
+        FROM agglomerated a
+    )
+    ,taskpolygonsnoindex as (
+        SELECT (st_dump(st_polygonize(s.geom))).geom AS geom
+        FROM simplifiedlines s
+    )
+    SELECT 
+        row_number () over () as taskid,
+        tpni.*
+    FROM taskpolygonsnoindex tpni
 );
+
+-- ALTER TABLE taskpolygons ADD PRIMARY KEY(taskid);
+SELECT Populate_Geometry_Columns('public.taskpolygons'::regclass);
 CREATE INDEX taskpolygons_idx
-ON taskpolygons
-USING GIST (geom);
+    ON taskpolygons
+    USING GIST (geom);
 -- VACUUM ANALYZE taskpolygons;
 
 
