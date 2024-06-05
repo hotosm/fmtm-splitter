@@ -17,6 +17,17 @@ repos:
       # Run the formatter
       - id: ruff-format
 
+  # Lint & Autoformat: SQL
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.0.7
+    hooks:
+      - id: sqlfluff-lint
+        files: ^fmtm_splitter/.*\.sql$
+        types: [sql]
+      - id: sqlfluff-fix
+        files: ^fmtm_splitter/.*\.sql$
+        types: [sql]
+
   # Autoformat: YAML, JSON, Markdown, etc.
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8

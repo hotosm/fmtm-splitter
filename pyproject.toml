@@ -101,5 +101,8 @@ ignore = ["N805", "B008"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.sqlfluff.core]
+dialect = "postgres"
+
 [project.scripts]
 fmtm-splitter = "fmtm_splitter.splitter:main"
