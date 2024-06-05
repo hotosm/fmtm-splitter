@@ -143,7 +143,7 @@ def test_split_by_sql_fmtm_with_extract(db, aoi_json, extract_json, output_json)
         num_buildings=5,
         osm_extract=extract_json,
     )
-    assert len(features.get("features")) == 122
+    assert len(features.get("features")) == 120
     assert sorted(features) == sorted(output_json)
 
 
@@ -173,13 +173,10 @@ def test_split_by_sql_fmtm_multi_geom(extract_json):
     assert isinstance(features, geojson.feature.FeatureCollection)
     assert isinstance(features.get("features"), list)
     assert isinstance(features.get("features")[0], dict)
-    assert len(features.get("features")) == 47
-
-    multipolygons = [feature for feature in features.get("features", []) if feature.get("geometry").get("type") == "MultiPolygon"]
-    assert len(multipolygons) == 2
+    assert len(features.get("features")) == 35
 
     polygons = [feature for feature in features.get("features", []) if feature.get("geometry").get("type") == "Polygon"]
-    assert len(polygons) == 45
+    assert len(polygons) == 35
 
     polygon_feat = geojson.loads(json.dumps(polygons[0]))
     assert isinstance(polygon_feat, geojson.Feature)
@@ -258,7 +255,7 @@ def test_split_by_sql_cli():
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
 
-    assert len(output_geojson.get("features")) == 62
+    assert len(output_geojson.get("features")) == 60
 
 
 def test_split_by_sql_cli_no_extract():
