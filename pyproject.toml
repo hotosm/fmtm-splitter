@@ -58,7 +58,6 @@ includes = ["fmtm_splitter"]
 source-includes = ["LICENSE.md", "README.md"]
 [tool.pdm.dev-dependencies]
 dev = [
-    "black>=23.7.0",
     "commitizen>=3.6.0",
     "pre-commit>=3.3.3",
 ]
@@ -77,10 +76,6 @@ docs = [
     "mkdocstrings-python>=1.5.2",
     "mkdocs-exclude>=1.0.2",
 ]
-
-[tool.black]
-line-length = 132
-target-versions = ["py310", "py311"]
 
 [tool.ruff]
 fix = true
