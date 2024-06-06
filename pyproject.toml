@@ -79,7 +79,7 @@ docs = [
 
 [tool.ruff]
 fix = true
-line-length = 132
+line-length = 88
 target-version = "py310"
 exclude = [
     ".git",
