@@ -30,7 +30,10 @@ from shapely.geometry import box, shape
 
 logging.basicConfig(
     level="DEBUG",
-    format=("%(asctime)s.%(msecs)03d [%(levelname)s] " "%(name)s | %(funcName)s:%(lineno)d | %(message)s"),
+    format=(
+        "%(asctime)s.%(msecs)03d [%(levelname)s] "
+        "%(name)s | %(funcName)s:%(lineno)d | %(message)s"
+    ),
     datefmt="%y-%m-%d %H:%M:%S",
     stream=sys.stdout,
 )
@@ -80,7 +83,9 @@ def aoi_multi_json():
             square_maxy = miny + (j + 1) * height
 
             # Create Polygon for each square
-            square_geojson = json.loads(to_geojson(box(square_minx, square_miny, square_maxx, square_maxy)))
+            square_geojson = json.loads(
+                to_geojson(box(square_minx, square_miny, square_maxx, square_maxy))
+            )
             squares.append(geojson.Feature(geometry=square_geojson))
 
     return geojson.FeatureCollection(features=squares)

@@ -37,7 +37,9 @@ def split_by_buildings(
 ):
     """Split the polygon by buildings in the database using an SQL query."""
     dbstring = f"PG:host={dbd[0]} dbname={dbd[1]} " f"user={dbd[2]} password={dbd[3]}"
-    dbshell = psycopg2.connect(host=dbd[0], database=dbd[1], user=dbd[2], password=dbd[3])
+    dbshell = psycopg2.connect(
+        host=dbd[0], database=dbd[1], user=dbd[2], password=dbd[3]
+    )
     dbshell.autocommit = True
     dbcursor = dbshell.cursor()
     dbcursor.execute("DROP TABLE IF EXISTS aoi;")
@@ -72,9 +74,16 @@ if __name__ == "__main__":
         """,
     )
     p.add_argument("-b", "--boundary", required=True, help="Polygon AOI GeoJSON file")
-    p.add_argument("-n", "--numfeatures", default=20, help="Number of features on average desired per task")
+    p.add_argument(
+        "-n",
+        "--numfeatures",
+        default=20,
+        help="Number of features on average desired per task",
+    )
     p.add_argument("-v", "--verbose", action="store_true", help="verbose output")
-    p.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
+    p.add_argument(
+        "-o", "--outfile", default="fmtm.geojson", help="Output file from splitting"
+    )
     p.add_argument("-ho", "--host", help="Database host", default="localhost")
     p.add_argument("-db", "--database", help="Database to use")
     p.add_argument("-u", "--user", help="Database username")
@@ -86,7 +95,9 @@ if __name__ == "__main__":
         quit()
 
     # if verbose, dump to the terminal.
-    formatter = logging.Formatter("%(threadName)10s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(threadName)10s - %(name)s - %(levelname)s - %(message)s"
+    )
     level = logging.DEBUG
     if args.verbose:
         log.setLevel(level)
@@ -114,6 +125,8 @@ if __name__ == "__main__":
     modularqueries = []
     for sqlfile in modularsqlfiles:
         with open(os.path.join(modulardir, sqlfile), "r") as sql:
-            modularqueries.append(sql.read().replace("{%numfeatures%}", str(args.numfeatures)))
+            modularqueries.append(
+                sql.read().replace("{%numfeatures%}", str(args.numfeatures))
+            )
     dbdetails = [args.host, args.database, args.user, args.password]
     features = split_by_buildings(aoi, modularqueries, dbdetails)

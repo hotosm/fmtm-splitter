@@ -28,11 +28,17 @@ def query(query_string, overpass_url):
     except Exception:
         print("overpass did not want to answer that one\n")
     if response.status_code == 200:
-        print(f"The overpass API at {overpass_url} accepted the query and " f"returned something.")
+        print(
+            f"The overpass API at {overpass_url} accepted the query and "
+            f"returned something."
+        )
         return response.text
     else:
         print(response)
-        print("Yeah, that didn't work. We reached the Overpass API but " "something went wrong on the server side.")
+        print(
+            "Yeah, that didn't work. We reached the Overpass API but "
+            "something went wrong on the server side."
+        )
 
 
 def dbpush(infile, dbd):
@@ -55,7 +61,10 @@ def dbpush(infile, dbd):
         p = subprocess.run(pg, capture_output=True, encoding="utf-8")
         response = p.stdout
         error = p.stderr
-        print(f"osm2pgsql seems to have accepted {infile} and " f"returned {response} \nand\n{error}")
+        print(
+            f"osm2pgsql seems to have accepted {infile} and "
+            f"returned {response} \nand\n{error}"
+        )
         return response
     except Exception as e:
         print(e)
@@ -70,7 +79,10 @@ if __name__ == "__main__":
     p.add_argument("-q", "--query", help="Text file in overpass query language")
     p.add_argument("-b", "--boundary", help="AOI as GeoJSON file")
     p.add_argument(
-        "-url", "--overpass_url", help="Overpass API server URL", default="https://overpass.kumi.systems/api/interpreter"
+        "-url",
+        "--overpass_url",
+        help="Overpass API server URL",
+        default="https://overpass.kumi.systems/api/interpreter",
     )
     p.add_argument("-ho", "--host", help="Database host", default="localhost")
     p.add_argument("-db", "--database", help="Database to use")

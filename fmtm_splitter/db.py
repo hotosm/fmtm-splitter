@@ -34,7 +34,9 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
-def create_connection(db: Union[str, psycopg2.extensions.connection]) -> psycopg2.extensions.connection:
+def create_connection(
+    db: Union[str, psycopg2.extensions.connection],
+) -> psycopg2.extensions.connection:
     """Get db connection from existing psycopg2 connection, or URL string.
 
     Args:
@@ -59,7 +61,10 @@ def create_connection(db: Union[str, psycopg2.extensions.connection]) -> psycopg
     elif _sqlalchemy_import and isinstance(db, sqlalchemy.orm.session.Session):
         conn = db.connection().connection
     else:
-        msg = "The `db` variable is not a valid string, psycopg connection, " "or SQLAlchemy Session."
+        msg = (
+            "The `db` variable is not a valid string, psycopg connection, "
+            "or SQLAlchemy Session."
+        )
         log.error(msg)
         raise ValueError(msg)
 
@@ -106,7 +111,9 @@ def create_tables(conn: psycopg2.extensions.connection):
             tags JSONB
         );
     """
-    log.debug("Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'")
+    log.debug(
+        "Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'"
+    )
     cur = conn.cursor()
     cur.execute(create_cmd)
 
@@ -171,5 +178,8 @@ def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> N
     Returns:
         None
     """
-    query = f"INSERT INTO {table_name}(geom,osm_id,tags) " "VALUES (%(geom)s,%(osm_id)s,%(tags)s)"
+    query = (
+        f"INSERT INTO {table_name}(geom,osm_id,tags) "
+        "VALUES (%(geom)s,%(osm_id)s,%(tags)s)"
+    )
     cur.execute(query, kwargs)

@@ -26,7 +26,13 @@ from uuid import uuid4
 import geojson
 import pytest
 
-from fmtm_splitter.splitter import FMTMSplitter, main, split_by_features, split_by_sql, split_by_square
+from fmtm_splitter.splitter import (
+    FMTMSplitter,
+    main,
+    split_by_features,
+    split_by_sql,
+    split_by_square,
+)
 
 log = logging.getLogger(__name__)
 
@@ -175,7 +181,11 @@ def test_split_by_sql_fmtm_multi_geom(extract_json):
     assert isinstance(features.get("features")[0], dict)
     assert len(features.get("features")) == 35
 
-    polygons = [feature for feature in features.get("features", []) if feature.get("geometry").get("type") == "Polygon"]
+    polygons = [
+        feature
+        for feature in features.get("features", [])
+        if feature.get("geometry").get("type") == "Polygon"
+    ]
     assert len(polygons) == 35
 
     polygon_feat = geojson.loads(json.dumps(polygons[0]))
@@ -218,7 +228,16 @@ def test_split_by_features_cli():
     split_geojson = Path(__file__).parent / "testdata" / "kathmandu_split.geojson"
 
     try:
-        main(["--boundary", str(infile), "--source", str(split_geojson), "--outfile", str(outfile)])
+        main(
+            [
+                "--boundary",
+                str(infile),
+                "--source",
+                str(split_geojson),
+                "--outfile",
+                str(outfile),
+            ]
+        )
     except SystemExit:
         pass
 
