@@ -150,7 +150,7 @@ class FMTMSplitter(object):
             raise ValueError(msg)
 
         return shape(features[0].get("geometry"))
-    
+
     def splitBySquare(  # noqa: N802
         self,
         meters: int,
@@ -175,10 +175,14 @@ class FMTMSplitter(object):
 
         cols = list(np.arange(xmin, xmax + width, width))
         rows = list(np.arange(ymin, ymax + length, length))
-        polygons=[]
+        polygons = []
         if extract_geojson:
-            features = extract_geojson.get('features', extract_geojson) if isinstance(extract_geojson, dict) else extract_geojson.features
-            extract_geoms = [shape(feature['geometry']) for feature in features]
+            features = (
+                extract_geojson.get("features", extract_geojson)
+                if isinstance(extract_geojson, dict)
+                else extract_geojson.features
+            )
+            extract_geoms = [shape(feature["geometry"]) for feature in features]
         else:
             extract_geoms = []
 
@@ -192,7 +196,9 @@ class FMTMSplitter(object):
                     if any(geom.within(clipped_polygon) for geom in extract_geoms):
                         polygons.append(clipped_polygon)
 
-        self.split_features = FeatureCollection([Feature(geometry=mapping(poly)) for poly in polygons])
+        self.split_features = FeatureCollection(
+            [Feature(geometry=mapping(poly)) for poly in polygons]
+        )
         return self.split_features
 
     def splitBySQL(  # noqa: N802
@@ -424,7 +430,7 @@ def split_by_square(
                 railway: not null
                 aeroway: not null
             """
-    )
+        )
         # Must be a BytesIO JSON object
         config_bytes = BytesIO(config_data.encode())
 
