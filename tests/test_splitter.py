@@ -61,38 +61,37 @@ def test_init_splitter_types(aoi_json):
     assert str(error.value) == "The input AOI cannot contain multiple geometries."
 
 
-def test_split_by_square_with_dict(aoi_json):
+def test_split_by_square_with_dict(aoi_json, extract_json):
     """Test divide by square from geojson dict types."""
     features = split_by_square(
-        aoi_json.get("features")[0],
-        meters=50,
+        aoi_json.get("features")[0], meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features")) == 50
     features = split_by_square(
-        aoi_json.get("features")[0].get("geometry"),
-        meters=50,
+        aoi_json.get("features")[0].get("geometry"), meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features")) == 50
 
 
-def test_split_by_square_with_str(aoi_json):
+def test_split_by_square_with_str(aoi_json, extract_json):
     """Test divide by square from geojson str and file."""
     # GeoJSON Dumps
     features = split_by_square(
-        geojson.dumps(aoi_json.get("features")[0]),
-        meters=50,
+        geojson.dumps(aoi_json.get("features")[0]), meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features")) == 50
     # JSON Dumps
     features = split_by_square(
         json.dumps(aoi_json.get("features")[0].get("geometry")),
         meters=50,
+        osm_extract=extract_json,
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features")) == 50
     # File
     features = split_by_square(
         "tests/testdata/kathmandu.geojson",
         meters=100,
+        osm_extract="tests/testdata/kathmandu_extract.geojson",
     )
     assert len(features.get("features")) == 15
 
@@ -105,26 +104,28 @@ def test_split_by_square_with_file_output():
     outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
     features = split_by_square(
         "tests/testdata/kathmandu.geojson",
+        osm_extract="tests/testdata/kathmandu_extract.geojson",
         meters=50,
         outfile=str(outfile),
     )
-    assert len(features.get("features")) == 54
+    assert len(features.get("features")) == 50
     # Also check output file
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
-    assert len(output_geojson.get("features")) == 54
+    assert len(output_geojson.get("features")) == 50
 
 
-def test_split_by_square_with_multigeom_input(aoi_multi_json):
+def test_split_by_square_with_multigeom_input(aoi_multi_json, extract_json):
     """Test divide by square from geojson dict types."""
     file_name = uuid4()
     outfile = Path(__file__).parent.parent / f"{file_name}.geojson"
     features = split_by_square(
         aoi_multi_json,
         meters=50,
+        osm_extract=extract_json,
         outfile=str(outfile),
     )
-    assert len(features.get("features", [])) == 60
+    assert len(features.get("features", [])) == 50
     for index in [0, 1, 2, 3]:
         assert Path(f"{Path(outfile).stem}_{index}.geojson)").exists()
 
@@ -208,10 +209,22 @@ def test_cli_help(capsys):
 def test_split_by_square_cli():
     """Test split by square works via CLI."""
     infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
+    extract_geojson = Path(__file__).parent / "testdata" / "kathmandu_extract.geojson"
     outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
 
     try:
-        main(["--boundary", str(infile), "--meters", "100", "--outfile", str(outfile)])
+        main(
+            [
+                "--boundary",
+                str(infile),
+                "--meters",
+                "100",
+                "--extract",
+                str(extract_geojson),
+                "--outfile",
+                str(outfile),
+            ]
+        )
     except SystemExit:
         pass
 
@@ -226,6 +239,7 @@ def test_split_by_features_cli():
     infile = Path(__file__).parent / "testdata" / "kathmandu.geojson"
     outfile = Path(__file__).parent.parent / f"{uuid4()}.geojson"
     split_geojson = Path(__file__).parent / "testdata" / "kathmandu_split.geojson"
+    extract_geojson = Path(__file__).parent / "testdata" / "kathmandu_extract.geojson"
 
     try:
         main(
@@ -234,6 +248,8 @@ def test_split_by_features_cli():
                 str(infile),
                 "--source",
                 str(split_geojson),
+                "--extract",
+                str(extract_geojson),
                 "--outfile",
                 str(outfile),
             ]
