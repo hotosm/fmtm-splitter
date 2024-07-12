@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.3.0 (2024-07-12)
+
+### Feat
+
+- added data extracts to avoid creating tasks with no features
+
+### Fix
+
+- precommit
+- check the lines count excluding minor highway tags
+
+### Refactor
+
+- use default line length 88 (over 132)
+
 ## 1.2.2 (2024-06-05)
 
 ### Refactor
