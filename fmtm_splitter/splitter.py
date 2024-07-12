@@ -160,6 +160,8 @@ class FMTMSplitter(object):
 
         Args:
             meters (int):  The size of each task square in meters.
+            extract_geojson (dict, FeatureCollection): an OSM extract geojson,
+                containing building polygons, or linestrings.
 
         Returns:
             data (FeatureCollection): A multipolygon of all the task boundaries.
@@ -404,6 +406,11 @@ def split_by_square(
             GeoJSON string, or FeatureCollection object.
         meters(str, optional): Specify the square size for the grid.
             Defaults to 100m grid.
+        osm_extract (str, FeatureCollection): an OSM extract geojson,
+            containing building polygons, or linestrings.
+            Optional param, if not included an extract is generated for you.
+            It is recommended to leave this param as default, unless you know
+            what you are doing.
         outfile(str): Output to a GeoJSON file on disk.
 
     Returns:
