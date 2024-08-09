@@ -29,7 +29,6 @@ from typing import Optional, Union
 import geojson
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
-from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, shape
 from shapely.geometry.geo import mapping
@@ -43,6 +42,7 @@ from fmtm_splitter.db import (
     drop_tables,
     insert_geom,
 )
+from osm_rawdata.postgres import PostgresClient
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -778,22 +778,12 @@ be either the data extract used by the XLSForm, or a postgresql database.
         raise ValueError(err)
 
     if args.meters:
-        if args.extract:
-            file = open(args.extract, "r")
-            data = geojson.load(file)
-            file.close()
-            split_by_square(
-                args.boundary,
-                meters=args.meters,
-                osm_extract=data,
-                outfile=args.outfile,
-            )
-        else:
-            split_by_square(
-                args.boundary,
-                meters=args.meters,
-                outfile=args.outfile,
-            )
+        split_by_square(
+            args.boundary,
+            meters=args.meters,
+            outfile=args.outfile,
+            osm_extract=args.extract,
+        )
     elif args.number:
         split_by_sql(
             args.boundary,
