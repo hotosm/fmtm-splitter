@@ -787,7 +787,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
                 meters=args.meters,
                 osm_extract=data,
                 outfile=args.outfile,
-                )
+            )
         else:
             split_by_square(
                 args.boundary,
