@@ -778,11 +778,22 @@ be either the data extract used by the XLSForm, or a postgresql database.
         raise ValueError(err)
 
     if args.meters:
-        split_by_square(
-            args.boundary,
-            meters=args.meters,
-            outfile=args.outfile,
-        )
+        if args.extract:
+            file = open(args.extract, "r")
+            data = geojson.load(file)
+            file.close()
+            split_by_square(
+                args.boundary,
+                meters=args.meters,
+                osm_extract=data,
+                outfile=args.outfile,
+            )
+        else:
+            split_by_square(
+                args.boundary,
+                meters=args.meters,
+                outfile=args.outfile,
+            )
     elif args.number:
         split_by_sql(
             args.boundary,
