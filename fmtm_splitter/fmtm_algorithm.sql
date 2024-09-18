@@ -369,8 +369,7 @@ CREATE TABLE taskpolygons AS (
     ),
 
     taskpolygonsnoindex AS (
-        SELECT
-            (ST_DUMP(ST_POLYGONIZE(s.geom))).geom AS geom
+        SELECT (ST_DUMP(ST_POLYGONIZE(s.geom))).geom AS geom
         FROM simplifiedlines AS s
     )
 
@@ -385,46 +384,57 @@ CREATE TABLE taskpolygons AS (
 -- Step 1: Identify polygons without any buildings
 DROP TABLE IF EXISTS no_building_polygons;
 CREATE TABLE no_building_polygons AS (
-    SELECT tp.geom AS no_building_geom, tp.*
-    FROM taskpolygons tp
-    LEFT JOIN buildings b ON ST_Intersects(tp.geom, b.geom)
+    SELECT
+        tp.*,
+        tp.geom AS no_building_geom
+    FROM taskpolygons AS tp
+    LEFT JOIN buildings AS b ON ST_INTERSECTS(tp.geom, b.geom)
     WHERE b.geom IS NULL
 );
 
 -- Step 2: Identify neighboring polygons
 DROP TABLE IF EXISTS neighboring_polygons;
 CREATE TABLE neighboring_polygons AS (
-    SELECT nb.geom AS neighbor_geom, nb.*, nb_building_count, nbp.no_building_geom
-    FROM taskpolygons nb
-    JOIN no_building_polygons nbp
-    ON ST_Touches(nbp.no_building_geom, nb.geom) -- Finds polygons that touch each other
+    SELECT
+        nb.*,
+        nb.geom AS neighbor_geom,
+        nb_building_count,
+        nbp.no_building_geom
+    FROM taskpolygons AS nb
+    INNER JOIN no_building_polygons AS nbp
+        -- Finds polygons that touch each other
+        ON ST_TOUCHES(nbp.no_building_geom, nb.geom)
     LEFT JOIN (
         -- Step 3: Count buildings in the neighboring polygons
-        SELECT nb.geom, COUNT(b.geom) AS nb_building_count
-        FROM taskpolygons nb
-        LEFT JOIN buildings b ON ST_Intersects(nb.geom, b.geom)
+        SELECT
+            nb.geom,
+            COUNT(b.geom) AS nb_building_count
+        FROM taskpolygons AS nb
+        LEFT JOIN buildings AS b ON ST_INTERSECTS(nb.geom, b.geom)
         GROUP BY nb.geom
     ) AS building_counts
-    ON nb.geom = building_counts.geom
+        ON nb.geom = building_counts.geom
 );
 
 -- Step 4: Find the optimal neighboring polygon to avoid,
 -- same polygons with the smallest number of buildings merging into multiple neighboring polygons
 DROP TABLE IF EXISTS optimal_neighbors;
 CREATE TABLE optimal_neighbors AS (
-    SELECT nbp.no_building_geom, nbp.neighbor_geom
-    FROM neighboring_polygons nbp
+    SELECT
+        nbp.no_building_geom,
+        nbp.neighbor_geom
+    FROM neighboring_polygons AS nbp
     WHERE nbp.nb_building_count = (
         SELECT MIN(nb_building_count)
-        FROM neighboring_polygons np
+        FROM neighboring_polygons AS np
         WHERE np.no_building_geom = nbp.no_building_geom
     )
 );
 
 -- Step 5: Merge the small polygons with their optimal neighboring polygons
 UPDATE taskpolygons tp
-SET geom = ST_Union(tp.geom, nbp.no_building_geom)
-FROM optimal_neighbors nbp
+SET geom = ST_UNION(tp.geom, nbp.no_building_geom)
+FROM optimal_neighbors AS nbp
 WHERE tp.geom = nbp.neighbor_geom;
 DELETE FROM taskpolygons
 WHERE geom IN (
@@ -457,4 +467,3 @@ FROM (
         ) AS feature
     FROM taskpolygons
 ) AS features;
-
