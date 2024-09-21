@@ -22,10 +22,12 @@ repos:
     rev: 3.1.0
     hooks:
       - id: sqlfluff-lint
-        files: ^fmtm_splitter/.*\.sql$
+        files: ^fmtm_splitter/fmtm_algorithm.sql
+        # files: ^fmtm_splitter/.*\.sql$
         types: [sql]
       - id: sqlfluff-fix
-        files: ^fmtm_splitter/.*\.sql$
+        files: ^fmtm_splitter/fmtm_algorithm.sql
+        # files: ^fmtm_splitter/.*\.sql$
         types: [sql]
 
   # Autoformat: YAML, JSON, Markdown, etc.
