@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.3.1 (2024-09-22)
+
+### Fix
+
+- merge holes with neighboring polygons
+- If --extract is used, it needs to be passed to split_by_square()
+
+### Refactor
+
+- pass args.data_extract and have parsing function handle it
+
 ## 1.3.0 (2024-07-12)
 
 ### Feat
