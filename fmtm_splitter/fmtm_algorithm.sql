@@ -229,10 +229,10 @@ CREATE TABLE clusteredbuildings AS (
     ),
 
     -- Cluster the buildings within each splitpolygon. The second term in the
-    -- call to the ST_ClusterKMeans function is the number of clusters to create,
-    -- so we're dividing the number of features by a constant (10 in this case)
-    -- to get the number of clusters required to get close to the right number
-    -- of features per cluster.
+    -- call to the ST_ClusterKMeans function is the number of clusters to 
+    -- create, so we're dividing the number of features by a constant 
+    -- (10 in this case) to get the number of clusters required to get close
+    -- to the right number of features per cluster.
     -- TODO: This should certainly not be a hardcoded, the number of features
     --       per cluster should come from a project configuration table
     buildingstocluster AS (
@@ -417,7 +417,8 @@ CREATE TABLE neighboring_polygons AS (
 );
 
 -- Step 4: Find the optimal neighboring polygon to avoid,
--- same polygons with the smallest number of buildings merging into multiple neighboring polygons
+-- same polygons with the smallest number of buildings merging into
+-- multiple neighboring polygons
 DROP TABLE IF EXISTS optimal_neighbors;
 CREATE TABLE optimal_neighbors AS (
     SELECT

@@ -29,7 +29,6 @@ from typing import Optional, Union
 import geojson
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
-from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, shape
 from shapely.geometry.geo import mapping
@@ -43,6 +42,7 @@ from fmtm_splitter.db import (
     drop_tables,
     insert_geom,
 )
+from osm_rawdata.postgres import PostgresClient
 
 # Instantiate logger
 log = logging.getLogger(__name__)
