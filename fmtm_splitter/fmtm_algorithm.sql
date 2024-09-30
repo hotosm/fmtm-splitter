@@ -116,7 +116,7 @@ CREATE TABLE buildings AS (
     SELECT
         b.*,
         polys.polyid
-    FROM "ways_poly" AS b, polygonsnocount AS polys
+    FROM ways_poly AS b, polygonsnocount AS polys
     WHERE
         ST_INTERSECTS(polys.geom, ST_CENTROID(b.geom))
         AND b.tags ->> 'building' IS NOT NULL
@@ -146,7 +146,7 @@ CREATE TABLE splitpolygons AS (
             COUNT(b.geom) AS numfeatures,
             ST_AREA(sp.geog) AS area
         FROM polygonsnocount AS sp
-        LEFT JOIN "buildings" AS b
+        LEFT JOIN buildings AS b
             ON sp.polyid = b.polyid
         GROUP BY sp.polyid, sp.geom
     )
@@ -170,7 +170,7 @@ CREATE TABLE lowfeaturecountpolygons AS (
         SELECT *
         FROM splitpolygons AS p
         -- TODO: feature count should not be hard-coded
-        WHERE p.numfeatures < %(num_buildings)s
+        WHERE p.numfeatures < p.%(num_buildings)s
     ),
 
     -- Find the neighbors of the low-feature-count polygons
@@ -244,9 +244,10 @@ CREATE TABLE clusteredbuildings AS (
         SELECT
             *,
             ST_CLUSTERKMEANS(
-                geom, CAST((b.numfeatures / %(num_buildings)s) + 1 AS integer)
+                b.geom,
+                CAST((b.numfeatures / b.%(num_buildings)s) + 1 AS integer)
             )
-                OVER (PARTITION BY polyid)
+                OVER (PARTITION BY b.polyid)
             AS cid
         FROM buildingstocluster AS b
     ),
