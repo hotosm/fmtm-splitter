@@ -170,7 +170,7 @@ CREATE TABLE lowfeaturecountpolygons AS (
         SELECT *
         FROM splitpolygons AS p
         -- TODO: feature count should not be hard-coded
-        WHERE p.numfeatures < p.%(num_buildings)s
+        WHERE p.numfeatures < %(num_buildings)s
     ),
 
     -- Find the neighbors of the low-feature-count polygons
@@ -245,7 +245,7 @@ CREATE TABLE clusteredbuildings AS (
             *,
             ST_CLUSTERKMEANS(
                 b.geom,
-                CAST((b.numfeatures / b.%(num_buildings)s) + 1 AS integer)
+                CAST((b.numfeatures / %(num_buildings)s) + 1 AS integer)
             )
                 OVER (PARTITION BY b.polyid)
             AS cid
