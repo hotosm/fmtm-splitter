@@ -31,10 +31,18 @@ import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
 from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
-from shapely.geometry import Polygon, box, shape
+from shapely.geometry import Polygon, shape
+from shapely.geometry.geo import mapping
 from shapely.ops import unary_union
 
-from fmtm_splitter.db import aoi_to_postgis, close_connection, create_connection, create_tables, drop_tables, insert_geom
+from fmtm_splitter.db import (
+    aoi_to_postgis,
+    close_connection,
+    create_connection,
+    create_tables,
+    drop_tables,
+    insert_geom,
+)
 
 # Instantiate logger
 log = logging.getLogger(__name__)
@@ -65,34 +73,48 @@ class FMTMSplitter(object):
         self.split_features = None
 
     @staticmethod
-    def input_to_geojson(input_data: Union[str, FeatureCollection, dict], merge: bool = False) -> GeoJSON:
+    def input_to_geojson(
+        input_data: Union[str, FeatureCollection, dict], merge: bool = False
+    ) -> GeoJSON:
         """Parse input data consistently to a GeoJSON obj."""
         log.info(f"Parsing GeoJSON from type {type(input_data)}")
-        if isinstance(input_data, str) and len(input_data) < 250 and Path(input_data).is_file():
+        if (
+            isinstance(input_data, str)
+            and len(input_data) < 250
+            and Path(input_data).is_file()
+        ):
             # Impose restriction for path lengths <250 chars
             with open(input_data, "r") as jsonfile:
                 try:
                     parsed_geojson = geojson.load(jsonfile)
                 except json.decoder.JSONDecodeError as e:
-                    raise IOError(f"File exists, but content is invalid JSON: {input_data}") from e
+                    raise IOError(
+                        f"File exists, but content is invalid JSON: {input_data}"
+                    ) from e
 
         elif isinstance(input_data, FeatureCollection):
             parsed_geojson = input_data
         elif isinstance(input_data, dict):
             parsed_geojson = geojson.loads(geojson.dumps(input_data))
         elif isinstance(input_data, str):
-            geojson_truncated = input_data if len(input_data) < 250 else f"{input_data[:250]}..."
+            geojson_truncated = (
+                input_data if len(input_data) < 250 else f"{input_data[:250]}..."
+            )
             log.debug(f"GeoJSON string passed: {geojson_truncated}")
             parsed_geojson = geojson.loads(input_data)
         else:
-            err = f"The specified AOI is not valid (must be geojson or str): {input_data}"
+            err = (
+                f"The specified AOI is not valid (must be geojson or str): {input_data}"
+            )
             log.error(err)
             raise ValueError(err)
 
         return parsed_geojson
 
     @staticmethod
-    def geojson_to_featcol(geojson: Union[FeatureCollection, Feature, dict]) -> FeatureCollection:
+    def geojson_to_featcol(
+        geojson: Union[FeatureCollection, Feature, dict],
+    ) -> FeatureCollection:
         """Standardise any geojson type to FeatureCollection."""
         # Parse and unparse geojson to extract type
         if isinstance(geojson, FeatureCollection):
@@ -107,7 +129,9 @@ class FMTMSplitter(object):
         return FeatureCollection(features)
 
     @staticmethod
-    def geojson_to_shapely_polygon(geojson: Union[FeatureCollection, Feature, dict]) -> Polygon:
+    def geojson_to_shapely_polygon(
+        geojson: Union[FeatureCollection, Feature, dict],
+    ) -> Polygon:
         """Parse GeoJSON and return shapely Polygon.
 
         The GeoJSON may be of type FeatureCollection, Feature, or Polygon,
@@ -130,11 +154,14 @@ class FMTMSplitter(object):
     def splitBySquare(  # noqa: N802
         self,
         meters: int,
+        extract_geojson: Optional[Union[dict, FeatureCollection]] = None,
     ) -> FeatureCollection:
         """Split the polygon into squares.
 
         Args:
             meters (int):  The size of each task square in meters.
+            extract_geojson (dict, FeatureCollection): an OSM extract geojson,
+                containing building polygons, or linestrings.
 
         Returns:
             data (FeatureCollection): A multipolygon of all the task boundaries.
@@ -150,13 +177,30 @@ class FMTMSplitter(object):
 
         cols = list(np.arange(xmin, xmax + width, width))
         rows = list(np.arange(ymin, ymax + length, length))
-
         polygons = []
+        if extract_geojson:
+            features = (
+                extract_geojson.get("features", extract_geojson)
+                if isinstance(extract_geojson, dict)
+                else extract_geojson.features
+            )
+            extract_geoms = [shape(feature["geometry"]) for feature in features]
+        else:
+            extract_geoms = []
+
         for x in cols[:-1]:
             for y in rows[:-1]:
-                polygons.append(box(x, y, x + width, y + length))
+                grid_polygon = Polygon(
+                    [(x, y), (x + width, y), (x + width, y + length), (x, y + length)]
+                )
+                clipped_polygon = grid_polygon.intersection(self.aoi)
+                if not clipped_polygon.is_empty:
+                    if any(geom.within(clipped_polygon) for geom in extract_geoms):
+                        polygons.append(clipped_polygon)
 
-        self.split_features = FeatureCollection([Feature(geometry=poly) for poly in polygons])
+        self.split_features = FeatureCollection(
+            [Feature(geometry=mapping(poly)) for poly in polygons]
+        )
         return self.split_features
 
     def splitBySQL(  # noqa: N802
@@ -195,7 +239,9 @@ class FMTMSplitter(object):
 
         # Run custom SQL
         if not buildings or not osm_extract:
-            log.info("No `buildings` or `osm_extract` params passed, executing custom SQL")
+            log.info(
+                "No `buildings` or `osm_extract` params passed, executing custom SQL"
+            )
             # FIXME untested
             conn = create_connection(db)
             splitter_cursor = conn.cursor()
@@ -323,7 +369,9 @@ class FMTMSplitter(object):
         # Clip the multi_polygon by the AOI boundary
         clipped_multi_polygon = multi_polygon.intersection(self.aoi)
 
-        polygon_features = [Feature(geometry=polygon) for polygon in list(clipped_multi_polygon.geoms)]
+        polygon_features = [
+            Feature(geometry=polygon) for polygon in list(clipped_multi_polygon.geoms)
+        ]
 
         # Convert the Polygon Features into a FeatureCollection
         self.split_features = FeatureCollection(features=polygon_features)
@@ -348,6 +396,7 @@ class FMTMSplitter(object):
 def split_by_square(
     aoi: Union[str, FeatureCollection],
     meters: int = 100,
+    osm_extract: Union[str, FeatureCollection] = None,
     outfile: Optional[str] = None,
 ) -> FeatureCollection:
     """Split an AOI by square, dividing into an even grid.
@@ -357,6 +406,11 @@ def split_by_square(
             GeoJSON string, or FeatureCollection object.
         meters(str, optional): Specify the square size for the grid.
             Defaults to 100m grid.
+        osm_extract (str, FeatureCollection): an OSM extract geojson,
+            containing building polygons, or linestrings.
+            Optional param, if not included an extract is generated for you.
+            It is recommended to leave this param as default, unless you know
+            what you are doing.
         outfile(str): Output to a GeoJSON file on disk.
 
     Returns:
@@ -366,6 +420,43 @@ def split_by_square(
     parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
 
+    if not osm_extract:
+        config_data = dedent(
+            """
+          query:
+            select:
+            from:
+              - nodes
+              - ways_poly
+              - ways_line
+            where:
+              tags:
+                highway: not null
+                building: not null
+                waterway: not null
+                railway: not null
+                aeroway: not null
+            """
+        )
+        # Must be a BytesIO JSON object
+        config_bytes = BytesIO(config_data.encode())
+
+        pg = PostgresClient(
+            "underpass",
+            config_bytes,
+        )
+        # The total FeatureCollection area merged by osm-rawdata automatically
+        extract_geojson = pg.execQuery(
+            aoi_featcol,
+            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
+        )
+
+    else:
+        extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
+    if not extract_geojson:
+        err = "A valid data extract must be provided."
+        log.error(err)
+        raise ValueError(err)
     # Handle multiple geometries passed
     if len(feat_array := aoi_featcol.get("features", [])) > 1:
         features = []
@@ -373,16 +464,16 @@ def split_by_square(
             featcol = split_by_square(
                 FeatureCollection(features=[feat]),
                 meters,
+                None,
                 f"{Path(outfile).stem}_{index}.geojson)" if outfile else None,
             )
-            feats = featcol.get("features", [])
-            if feats:
+            if feats := featcol.get("features", []):
                 features += feats
         # Parse FeatCols into single FeatCol
         split_features = FeatureCollection(features)
     else:
         splitter = FMTMSplitter(aoi_featcol)
-        split_features = splitter.splitBySquare(meters)
+        split_features = splitter.splitBySquare(meters, extract_geojson)
         if not split_features:
             msg = "Failed to generate split features."
             log.error(msg)
@@ -511,7 +602,9 @@ def split_by_sql(
         split_features = FeatureCollection(features)
     else:
         splitter = FMTMSplitter(aoi_featcol)
-        split_features = splitter.splitBySQL(query, db, num_buildings, osm_extract=extract_geojson)
+        split_features = splitter.splitBySQL(
+            query, db, num_buildings, osm_extract=extract_geojson
+        )
         if not split_features:
             msg = "Failed to generate split features."
             log.error(msg)
@@ -635,16 +728,31 @@ be either the data extract used by the XLSForm, or a postgresql database.
     )
     # The default SQL query for feature splitting
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
-    parser.add_argument("-o", "--outfile", default="fmtm.geojson", help="Output file from splitting")
-    parser.add_argument("-m", "--meters", nargs="?", const=50, help="Size in meters if using square splitting")
-    parser.add_argument("-number", "--number", nargs="?", const=5, help="Number of buildings in a task")
+    parser.add_argument(
+        "-o", "--outfile", default="fmtm.geojson", help="Output file from splitting"
+    )
+    parser.add_argument(
+        "-m",
+        "--meters",
+        nargs="?",
+        const=50,
+        help="Size in meters if using square splitting",
+    )
+    parser.add_argument(
+        "-number", "--number", nargs="?", const=5, help="Number of buildings in a task"
+    )
     parser.add_argument("-b", "--boundary", required=True, help="Polygon AOI")
     parser.add_argument("-s", "--source", help="Source data, Geojson or PG:[dbname]")
     parser.add_argument("-c", "--custom", help="Custom SQL query for database")
     parser.add_argument(
-        "-db", "--dburl", default="postgresql://fmtm:dummycipassword@db:5432/splitter", help="The database url string to custom sql"
+        "-db",
+        "--dburl",
+        default="postgresql://fmtm:dummycipassword@db:5432/splitter",
+        help="The database url string to custom sql",
     )
-    parser.add_argument("-e", "--extract", help="The OSM data extract for fmtm splitter")
+    parser.add_argument(
+        "-e", "--extract", help="The OSM data extract for fmtm splitter"
+    )
 
     # Accept command line args, or func params
     args = parser.parse_args(args_list)
@@ -655,7 +763,10 @@ be either the data extract used by the XLSForm, or a postgresql database.
     # Set logger
     logging.basicConfig(
         level="DEBUG" if args.verbose else "INFO",
-        format=("%(asctime)s.%(msecs)03d [%(levelname)s] " "%(name)s | %(funcName)s:%(lineno)d | %(message)s"),
+        format=(
+            "%(asctime)s.%(msecs)03d [%(levelname)s] "
+            "%(name)s | %(funcName)s:%(lineno)d | %(message)s"
+        ),
         datefmt="%y-%m-%d %H:%M:%S",
         stream=sys.stdout,
     )
@@ -671,6 +782,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
             args.boundary,
             meters=args.meters,
             outfile=args.outfile,
+            osm_extract=args.extract,
         )
     elif args.number:
         split_by_sql(

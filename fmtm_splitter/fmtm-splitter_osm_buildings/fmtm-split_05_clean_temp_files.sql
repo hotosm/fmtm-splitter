@@ -1,4 +1,4 @@
- /*
+/*
 Licence: GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
 Part of the HOT Field Mapping Tasking Manager (FMTM)
 

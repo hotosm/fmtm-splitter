@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 1.3.1 (2024-09-22)
+
+### Fix
+
+- merge holes with neighboring polygons
+- If --extract is used, it needs to be passed to split_by_square()
+
+### Refactor
+
+- pass args.data_extract and have parsing function handle it
+
+## 1.3.0 (2024-07-12)
+
+### Feat
+
+- added data extracts to avoid creating tasks with no features
+
+### Fix
+
+- precommit
+- check the lines count excluding minor highway tags
+
+### Refactor
+
+- use default line length 88 (over 132)
+
+## 1.2.2 (2024-06-05)
+
+### Refactor
+
+- run sqlfluff and format sql files
+- simplified the boundary of splitted ploygons and removed hardcoded buildings number
+- removed redundant sql
+- updated algorithm to split aoi when no linear features, by clustering
+
+## 1.2.1 (2024-03-21)
+
+### Fix
+
+- clip square grid with AOI
+
 ## 1.2.0 (2024-03-08)
 
 ### Feat

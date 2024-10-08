@@ -65,11 +65,12 @@ plugins:
 
 nav:
   - Home: index.md
-  - About: about.md
+  - Get Started:
+      - About: about.md
+      - License: LICENSE.md
+      - Changelog: CHANGELOG.md
+      - Code of Conduct: https://docs.hotosm.org/code-of-conduct
+      - Versioning: https://docs.hotosm.org/dev-guide/repo-management/version-control/#creating-releases
   - Usage: usage.md
   - API: api.md
-  - Testing Visually: testing-visually.md
-  - License: LICENSE.md
-  - Code of Conduct: https://docs.hotosm.org/code-of-conduct
-  - Changelog: CHANGELOG.md
-  - Versioning: https://docs.hotosm.org/dev-guide/version-control/#creating-releases
+  - Testing via UI: testing-via-ui.md
