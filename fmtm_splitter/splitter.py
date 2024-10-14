@@ -154,7 +154,6 @@ class FMTMSplitter(object):
     def splitBySquare(  # noqa: N802
         self,
         meters: int,
-        extract_geojson: Optional[Union[dict, FeatureCollection]] = None,
     ) -> FeatureCollection:
         """Split the polygon into squares.
 
@@ -178,26 +177,13 @@ class FMTMSplitter(object):
         cols = list(np.arange(xmin, xmax + width, width))
         rows = list(np.arange(ymin, ymax + length, length))
         polygons = []
-        if extract_geojson:
-            features = (
-                extract_geojson.get("features", extract_geojson)
-                if isinstance(extract_geojson, dict)
-                else extract_geojson.features
-            )
-            extract_geoms = [shape(feature["geometry"]) for feature in features]
-        else:
-            extract_geoms = []
-
         for x in cols[:-1]:
             for y in rows[:-1]:
                 grid_polygon = Polygon(
                     [(x, y), (x + width, y), (x + width, y + length), (x, y + length)]
                 )
                 clipped_polygon = grid_polygon.intersection(self.aoi)
-                if not clipped_polygon.is_empty:
-                    if any(geom.within(clipped_polygon) for geom in extract_geoms):
-                        polygons.append(clipped_polygon)
-
+                polygons.append(clipped_polygon)
         self.split_features = FeatureCollection(
             [Feature(geometry=mapping(poly)) for poly in polygons]
         )
@@ -396,7 +382,6 @@ class FMTMSplitter(object):
 def split_by_square(
     aoi: Union[str, FeatureCollection],
     meters: int = 100,
-    osm_extract: Union[str, FeatureCollection] = None,
     outfile: Optional[str] = None,
 ) -> FeatureCollection:
     """Split an AOI by square, dividing into an even grid.
@@ -420,43 +405,6 @@ def split_by_square(
     parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
 
-    if not osm_extract:
-        config_data = dedent(
-            """
-          query:
-            select:
-            from:
-              - nodes
-              - ways_poly
-              - ways_line
-            where:
-              tags:
-                highway: not null
-                building: not null
-                waterway: not null
-                railway: not null
-                aeroway: not null
-            """
-        )
-        # Must be a BytesIO JSON object
-        config_bytes = BytesIO(config_data.encode())
-
-        pg = PostgresClient(
-            "underpass",
-            config_bytes,
-        )
-        # The total FeatureCollection area merged by osm-rawdata automatically
-        extract_geojson = pg.execQuery(
-            aoi_featcol,
-            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
-        )
-
-    else:
-        extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
-    if not extract_geojson:
-        err = "A valid data extract must be provided."
-        log.error(err)
-        raise ValueError(err)
     # Handle multiple geometries passed
     if len(feat_array := aoi_featcol.get("features", [])) > 1:
         features = []
@@ -473,7 +421,7 @@ def split_by_square(
         split_features = FeatureCollection(features)
     else:
         splitter = FMTMSplitter(aoi_featcol)
-        split_features = splitter.splitBySquare(meters, extract_geojson)
+        split_features = splitter.splitBySquare(meters)
         if not split_features:
             msg = "Failed to generate split features."
             log.error(msg)
