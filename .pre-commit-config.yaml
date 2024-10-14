@@ -19,7 +19,7 @@ repos:
 
   # Lint & Autoformat: SQL
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 3.2.2
+    rev: 3.2.3
     hooks:
       - id: sqlfluff-lint
         files: ^fmtm_splitter/fmtm_algorithm.sql
