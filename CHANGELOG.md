@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.3.2 (2024-10-14)
+
+### Fix
+
+- remove osm-extracts from split by square
+- invalid inclusion of alias to get num_buildings by pre-commit
+
+### Refactor
+
+- move old splitting algorithm parts --> postgis_snippets
+
 ## 1.3.1 (2024-09-22)
 
 ### Fix
