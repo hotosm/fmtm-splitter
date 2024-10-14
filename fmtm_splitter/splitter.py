@@ -194,9 +194,9 @@ class FMTMSplitter(object):
                 )
                 clipped_polygon = grid_polygon.intersection(self.aoi)
                 if extract_geoms:
-                        # Check if any extract geometry is within the clipped grid
-                        if any(geom.within(clipped_polygon) for geom in extract_geoms):
-                            polygons.append(clipped_polygon)
+                    # Check if any extract geometry is within the clipped grid
+                    if any(geom.within(clipped_polygon) for geom in extract_geoms):
+                        polygons.append(clipped_polygon)
                 else:
                     polygons.append(clipped_polygon)
 
@@ -425,7 +425,7 @@ def split_by_square(
 
     if osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
-    
+
     # Handle multiple geometries passed
     if len(feat_array := aoi_featcol.get("features", [])) > 1:
         features = []
