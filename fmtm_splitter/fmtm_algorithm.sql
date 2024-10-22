@@ -4,7 +4,6 @@ DROP TABLE IF EXISTS polygonsnocount;
 DO $$
     DECLARE 
     lines_count INTEGER;
-    num_buildings INTEGER;
 BEGIN
     -- Check if ways_line has any data
     SELECT COUNT(*) INTO lines_count
@@ -135,7 +134,6 @@ USING gist (geom);
 -- Clean up the table which may have gaps and stuff from spatial indexing
 -- VACUUM ANALYZE buildings;
 
-
 DROP TABLE IF EXISTS splitpolygons;
 CREATE TABLE splitpolygons AS (
     WITH polygonsfeaturecount AS (
@@ -163,49 +161,49 @@ USING gist (geom);
 DROP TABLE polygonsnocount;
 
 
-DROP TABLE IF EXISTS lowfeaturecountpolygons;
-CREATE TABLE lowfeaturecountpolygons AS (
--- Grab the polygons with fewer than the requisite number of features
-    WITH lowfeaturecountpolys AS (
-        SELECT *
-        FROM splitpolygons AS p
-        -- TODO: feature count should not be hard-coded
-        WHERE p.numfeatures < %(num_buildings)s
-    ),
+-- DROP TABLE IF EXISTS lowfeaturecountpolygons;
+-- CREATE TABLE lowfeaturecountpolygons AS (
+-- -- Grab the polygons with fewer than the requisite number of features
+--     WITH lowfeaturecountpolys AS (
+--         SELECT *
+--         FROM splitpolygons AS p
+--         -- TODO: feature count should not be hard-coded
+--         WHERE p.numfeatures < %(num_buildings)s
+--     ),
 
-    -- Find the neighbors of the low-feature-count polygons
-    -- Store their ids as n_polyid, numfeatures as n_numfeatures, etc
-    allneighborlist AS (
-        SELECT
-            p.*,
-            pf.polyid AS n_polyid,
-            pf.area AS n_area,
-            p.numfeatures AS n_numfeatures,
-            -- length of shared boundary to make nice merge decisions 
-            ST_LENGTH2D(ST_INTERSECTION(p.geom, pf.geom)) AS sharedbound
-        FROM lowfeaturecountpolys AS p
-        INNER JOIN splitpolygons AS pf
-            -- Anything that touches
-            ON ST_TOUCHES(p.geom, pf.geom)
-            -- But eliminate those whose intersection is a point, because
-            -- polygons that only touch at a corner shouldn't be merged
-            AND ST_GEOMETRYTYPE(ST_INTERSECTION(p.geom, pf.geom)) != 'ST_Point'
-        -- Sort first by polyid of the low-feature-count polygons
-        -- Then by descending featurecount and area of the 
-        -- high-feature-count neighbors (area is in case of equal 
-        -- featurecounts, we'll just pick the biggest to add to)
-        ORDER BY p.polyid ASC, p.numfeatures DESC, pf.area DESC
-    -- OR, maybe for more aesthetic merges:
-    -- order by p.polyid, sharedbound desc
-    )
+--     -- Find the neighbors of the low-feature-count polygons
+--     -- Store their ids as n_polyid, numfeatures as n_numfeatures, etc
+--     allneighborlist AS (
+--         SELECT
+--             p.*,
+--             pf.polyid AS n_polyid,
+--             pf.area AS n_area,
+--             p.numfeatures AS n_numfeatures,
+--             -- length of shared boundary to make nice merge decisions 
+--             ST_LENGTH2D(ST_INTERSECTION(p.geom, pf.geom)) AS sharedbound
+--         FROM lowfeaturecountpolys AS p
+--         INNER JOIN splitpolygons AS pf
+--             -- Anything that touches
+--             ON ST_TOUCHES(p.geom, pf.geom)
+--             -- But eliminate those whose intersection is a point, because
+--             -- polygons that only touch at a corner shouldn't be merged
+--             AND ST_GEOMETRYTYPE(ST_INTERSECTION(p.geom, pf.geom)) != 'ST_Point'
+--         -- Sort first by polyid of the low-feature-count polygons
+--         -- Then by descending featurecount and area of the 
+--         -- high-feature-count neighbors (area is in case of equal 
+--         -- featurecounts, we'll just pick the biggest to add to)
+--         ORDER BY p.polyid ASC, p.numfeatures DESC, pf.area DESC
+--     -- OR, maybe for more aesthetic merges:
+--     -- order by p.polyid, sharedbound desc
+--     )
 
-    SELECT DISTINCT ON (a.polyid) * FROM allneighborlist AS a
-);
-ALTER TABLE lowfeaturecountpolygons ADD PRIMARY KEY (polyid);
-SELECT POPULATE_GEOMETRY_COLUMNS('public.lowfeaturecountpolygons'::regclass);
-CREATE INDEX lowfeaturecountpolygons_idx
-ON lowfeaturecountpolygons
-USING gist (geom);
+--     SELECT DISTINCT ON (a.polyid) * FROM allneighborlist AS a
+-- );
+-- ALTER TABLE lowfeaturecountpolygons ADD PRIMARY KEY (polyid);
+-- SELECT POPULATE_GEOMETRY_COLUMNS('public.lowfeaturecountpolygons'::regclass);
+-- CREATE INDEX lowfeaturecountpolygons_idx
+-- ON lowfeaturecountpolygons
+-- USING gist (geom);
 -- VACUUM ANALYZE lowfeaturecountpolygons;
 
 
@@ -335,7 +333,6 @@ USING gist (geom);
 
 --VACUUM ANALYZE unsimplifiedtaskpolygons;
 
-
 --*****************************Simplify*******************************
 -- Extract unique line segments
 DROP TABLE IF EXISTS taskpolygons;
@@ -380,78 +377,70 @@ CREATE TABLE taskpolygons AS (
     FROM taskpolygonsnoindex AS tpni
 );
 
--- ALTER TABLE taskpolygons ADD PRIMARY KEY(taskid);
-
--- Step 1: Identify polygons without any buildings
-DROP TABLE IF EXISTS no_building_polygons;
-CREATE TABLE no_building_polygons AS (
-    SELECT
-        tp.*,
-        tp.geom AS no_building_geom
-    FROM taskpolygons AS tp
-    LEFT JOIN buildings AS b ON ST_INTERSECTS(tp.geom, b.geom)
-    WHERE b.geom IS NULL
-);
-
--- Step 2: Identify neighboring polygons
-DROP TABLE IF EXISTS neighboring_polygons;
-CREATE TABLE neighboring_polygons AS (
-    SELECT
-        nb.*,
-        nb.geom AS neighbor_geom,
-        nb_building_count,
-        nbp.no_building_geom
-    FROM taskpolygons AS nb
-    INNER JOIN no_building_polygons AS nbp
-        -- Finds polygons that touch each other
-        ON ST_TOUCHES(nbp.no_building_geom, nb.geom)
-    LEFT JOIN (
-        -- Step 3: Count buildings in the neighboring polygons
-        SELECT
-            nb.geom,
-            COUNT(b.geom) AS nb_building_count
-        FROM taskpolygons AS nb
-        LEFT JOIN buildings AS b ON ST_INTERSECTS(nb.geom, b.geom)
-        GROUP BY nb.geom
-    ) AS building_counts
-        ON nb.geom = building_counts.geom
-);
-
--- Step 4: Find the optimal neighboring polygon to avoid,
--- same polygons with the smallest number of buildings merging into
--- multiple neighboring polygons
-DROP TABLE IF EXISTS optimal_neighbors;
-CREATE TABLE optimal_neighbors AS (
-    SELECT
-        nbp.no_building_geom,
-        nbp.neighbor_geom
-    FROM neighboring_polygons AS nbp
-    WHERE nbp.nb_building_count = (
-        SELECT MIN(nb_building_count)
-        FROM neighboring_polygons AS np
-        WHERE np.no_building_geom = nbp.no_building_geom
-    )
-);
-
--- Step 5: Merge the small polygons with their optimal neighboring polygons
-UPDATE taskpolygons tp
-SET geom = ST_UNION(tp.geom, nbp.no_building_geom)
-FROM optimal_neighbors AS nbp
-WHERE tp.geom = nbp.neighbor_geom;
-DELETE FROM taskpolygons
-WHERE geom IN (
-    SELECT no_building_geom
-    FROM no_building_polygons
-);
-
-
-DROP TABLE IF EXISTS no_building_polygons;
-DROP TABLE IF EXISTS neighboring_polygons;
-
+ALTER TABLE taskpolygons ADD PRIMARY KEY(taskid);
 SELECT POPULATE_GEOMETRY_COLUMNS('public.taskpolygons'::regclass);
 CREATE INDEX taskpolygons_idx
 ON taskpolygons
 USING gist (geom);
+
+-- Merge least feature polygons with neighbouring polygons
+DO $$
+DECLARE
+    num_buildings INTEGER := %(num_buildings)s;
+    min_area NUMERIC; -- Set the minimum area threshold
+    mean_area NUMERIC;
+    stddev_area NUMERIC; -- Set the standard deviation
+    min_buildings INTEGER; -- Set the minimum number of buildings threshold
+    small_polygon RECORD; -- set small_polygon and nearest_neighbor as record 
+    nearest_neighbor RECORD; -- in order to use them in the loop
+BEGIN
+    min_buildings := num_buildings * 0.5;
+
+    -- Find the mean and standard deviation of the area
+    SELECT 
+        AVG(ST_Area(geom)),
+        STDDEV_POP(ST_Area(geom))
+    INTO mean_area, stddev_area
+    FROM taskpolygons;
+
+    -- Set the threshold as mean - standard deviation
+    min_area := mean_area - stddev_area;
+
+    DROP TABLE IF EXISTS leastfeaturepolygons;
+    CREATE TABLE leastfeaturepolygons AS
+    SELECT taskid, geom
+    FROM taskpolygons
+    WHERE ST_Area(geom) < min_area OR (
+        SELECT COUNT(b.id) FROM buildings b 
+        WHERE ST_Contains(taskpolygons.geom, b.geom)
+    ) < min_buildings; -- find least feature polygons based on the area and feature
+
+    FOR small_polygon IN 
+        SELECT * FROM leastfeaturepolygons
+    LOOP
+        -- Find the nearest neighbor to merge the small polygon with
+        FOR nearest_neighbor IN
+        SELECT taskid, geom, ST_LENGTH2D(ST_Intersection(small_polygon.geom, geom)) as shared_bound
+        FROM taskpolygons
+        WHERE taskid NOT IN (SELECT taskid FROM leastfeaturepolygons)
+        AND ST_Touches(small_polygon.geom, geom)
+        AND ST_GEOMETRYTYPE(ST_INTERSECTION(small_polygon.geom, geom)) != 'ST_Point'
+        ORDER BY shared_bound DESC  -- Find neighbor polygon based on shared boundary distance
+        LIMIT 1
+        LOOP
+            -- Merge the small polygon into the neighboring polygon
+            UPDATE taskpolygons
+            SET geom = ST_Union(geom, small_polygon.geom)
+            WHERE taskid = nearest_neighbor.taskid;
+
+            DELETE FROM taskpolygons WHERE taskid = small_polygon.taskid;
+            -- Exit the neighboring polygon loop after one successful merge
+            EXIT;
+        END LOOP;
+    END LOOP;
+END $$;
+
+DROP TABLE IF EXISTS leastfeaturepolygons;
 -- VACUUM ANALYZE taskpolygons;
 
 -- Generate GeoJSON output
@@ -464,8 +453,14 @@ FROM (
     SELECT
         JSONB_BUILD_OBJECT(
             'type', 'Feature',
-            'geometry', ST_ASGEOJSON(geom)::jsonb,
-            'properties', JSONB_BUILD_OBJECT()
+            'geometry', ST_ASGEOJSON(t.geom)::jsonb,
+            'properties', JSONB_BUILD_OBJECT(
+                'building_count', (
+                    SELECT COUNT(b.id)
+                    FROM buildings b
+                    WHERE ST_Contains(t.geom, b.geom)
+                )
+            )
         ) AS feature
-    FROM taskpolygons
+    FROM taskpolygons t
 ) AS features;
