@@ -243,7 +243,7 @@ CREATE TABLE clusteredbuildings AS (
             *,
             ST_CLUSTERKMEANS(
                 b.geom,
-                CAST((b.numfeatures / %(num_buildings)s) + 1 AS integer)
+                CAST((b.numfeatures / b.%(num_buildings)s) + 1 AS integer)
             )
                 OVER (PARTITION BY b.polyid)
             AS cid
@@ -377,7 +377,7 @@ CREATE TABLE taskpolygons AS (
     FROM taskpolygonsnoindex AS tpni
 );
 
-ALTER TABLE taskpolygons ADD PRIMARY KEY(taskid);
+ALTER TABLE taskpolygons ADD PRIMARY KEY (taskid);
 SELECT POPULATE_GEOMETRY_COLUMNS('public.taskpolygons'::regclass);
 CREATE INDEX taskpolygons_idx
 ON taskpolygons
@@ -457,10 +457,10 @@ FROM (
             'properties', JSONB_BUILD_OBJECT(
                 'building_count', (
                     SELECT COUNT(b.id)
-                    FROM buildings b
-                    WHERE ST_Contains(t.geom, b.geom)
+                    FROM buildings AS b
+                    WHERE ST_CONTAINS(t.geom, b.geom)
                 )
             )
         ) AS feature
-    FROM taskpolygons t
+    FROM taskpolygons AS t
 ) AS features;
