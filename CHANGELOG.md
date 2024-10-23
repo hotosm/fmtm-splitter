@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 1.4.0 (2024-10-24)
+
+### Fix
+
+- add missed unsimplifiedtaskpolygons to table drop
+
+### Refactor
+
+- remove support for sqlalchemy connections (psycopg2 driver only)
+
 ## 1.3.2 (2024-10-14)
 
 ### Fix
