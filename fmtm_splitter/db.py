@@ -43,7 +43,7 @@ def create_connection(
         db (str, psycopg2.extensions.connection, sqlalchemy.orm.session.Session):
             string or existing db connection.
             If `db` is a string, a new connection is generated.
-            If `db` is a psycopg connection, the connection is re-used.
+            If `db` is a psycopg2 connection, the connection is re-used.
             If `db` is a sqlalchemy.orm.session.Session object, the connection
                 is also reused.
 
@@ -62,7 +62,7 @@ def create_connection(
         conn = db.connection().connection
     else:
         msg = (
-            "The `db` variable is not a valid string, psycopg connection, "
+            "The `db` variable is not a valid string, psycopg2 connection, "
             "or SQLAlchemy Session."
         )
         log.error(msg)
