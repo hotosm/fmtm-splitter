@@ -24,13 +24,6 @@ from psycopg2.extensions import register_adapter
 from psycopg2.extras import Json, register_uuid
 from shapely.geometry import Polygon
 
-try:
-    import sqlalchemy
-
-    _sqlalchemy_import = True
-except ImportError:
-    _sqlalchemy_import = False
-
 log = logging.getLogger(__name__)
 
 
@@ -40,12 +33,10 @@ def create_connection(
     """Get db connection from existing psycopg2 connection, or URL string.
 
     Args:
-        db (str, psycopg2.extensions.connection, sqlalchemy.orm.session.Session):
+        db (str, psycopg2.extensions.connection):
             string or existing db connection.
             If `db` is a string, a new connection is generated.
             If `db` is a psycopg2 connection, the connection is re-used.
-            If `db` is a sqlalchemy.orm.session.Session object, the connection
-                is also reused.
 
     Returns:
         conn: DBAPI connection object to generate cursors from.
@@ -58,13 +49,8 @@ def create_connection(
         conn = db
     elif isinstance(db, str):
         conn = psycopg2.connect(db)
-    elif _sqlalchemy_import and isinstance(db, sqlalchemy.orm.session.Session):
-        conn = db.connection().connection
     else:
-        msg = (
-            "The `db` variable is not a valid string, psycopg2 connection, "
-            "or SQLAlchemy Session."
-        )
+        msg = "The `db` variable is not a valid string or psycopg2 connection."
         log.error(msg)
         raise ValueError(msg)
 

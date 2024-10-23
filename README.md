@@ -126,29 +126,8 @@ split_features = split_by_sql(
 
 - The db parameter can be a connection string to start a new connection.
 - Or an existing database connection can be reused.
-- To do this, either the psycopg2 connection, or a SQLAlchemy Session
+- To do this, either the psycopg2 connection, or a DBAPI connection string
   must be passed:
-
-SQLAlchemy example:
-
-```python
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from fmtm_splitter.splitter import split_by_sql
-
-# Creates a SQLAlchemy Session object
-engine = create_engine("postgresql://postgres:postgres@localhost/postgres")
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-db = SessionLocal()
-
-# Then pass this object as the db param
-split_features = split_by_sql(
-    aoi,
-    db,
-    num_buildings=50,
-    osm_extract=osm_extracts,
-)
-```
 
 psycopg2 example:
 
