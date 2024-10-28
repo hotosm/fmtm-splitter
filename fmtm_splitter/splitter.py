@@ -211,12 +211,12 @@ class FMTMSplitter(object):
         xmin, ymin, xmax, ymax = self.aoi.bounds
 
         reference_lat = (ymin + ymax) / 2
-        length_deg, width_deg = self.meters_to_degrees(reference_lat, meters)
+        length_deg, width_deg = self.meters_to_degrees(meters, reference_lat)
 
         # Create grid columns and rows based on the AOI bounds
         cols = np.arange(xmin, xmax + width_deg, width_deg)
         rows = np.arange(ymin, ymax + length_deg, length_deg)
-        polygons = []
+
         extract_geoms = []
         if extract_geojson:
             features = (
@@ -226,13 +226,18 @@ class FMTMSplitter(object):
             )
             extract_geoms = [shape(feature["geometry"]) for feature in features]
 
+        # Generate grid polygons and clip them by AOI
+        polygons = []
         for x in cols[:-1]:
             for y in rows[:-1]:
                 grid_polygon = box(x, y, x + width_deg, y + length_deg)
                 clipped_polygon = grid_polygon.intersection(self.aoi)
 
+                if clipped_polygon.is_empty:
+                    continue
+
+                # Check intersection with extract geometries if available
                 if extract_geoms:
-                    # Check if any extract geometry is within the clipped grid
                     if any(geom.within(clipped_polygon) for geom in extract_geoms):
                         polygons.append(clipped_polygon)
                 else:
