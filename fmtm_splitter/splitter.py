@@ -32,7 +32,7 @@ import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
 from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
-from shapely.geometry import Polygon, shape, box
+from shapely.geometry import Polygon, box, shape
 from shapely.geometry.geo import mapping
 from shapely.ops import unary_union
 
@@ -153,17 +153,14 @@ class FMTMSplitter(object):
         return shape(features[0].get("geometry"))
 
     def meters_to_degrees(
-            self, 
-            meters: float, 
-            reference_lat: float
-        ) -> Tuple[float, float]:
-        """
-        Converts meters to degrees at a given latitude using WGS84 ellipsoidal calculations.
-    
+        self, meters: float, reference_lat: float
+    ) -> Tuple[float, float]:
+        """Converts meters to degrees at a given latitude using WGS84 ellipsoidal calculations.
+
         Args:
             meters (float): The distance in meters to convert.
             reference_lat (float): The latitude at which to perform the conversion (in degrees).
-    
+
         Returns:
             Tuple[float, float]: Degree values for latitude and longitude.
         """
@@ -174,21 +171,25 @@ class FMTMSplitter(object):
         lat_rad = math.radians(reference_lat)
 
         # Using WGS84 parameters
-        a = 6378137.0 # Semi-major axis in meters
+        a = 6378137.0  # Semi-major axis in meters
         f = 1 / 298.257223563  # Flattening factor
 
         # Applying formula
-        e2 = (2 * f) - (f ** 2)  # Eccentricity squared
-        N = a / math.sqrt(1 - e2 * math.sin(lat_rad)**2)  # Radius of curvature in the prime vertical
-        M = a * (1 - e2) / (1 - e2 * math.sin(lat_rad)**2)**(3 / 2)  # Radius of curvature in the meridian
-    
+        e2 = (2 * f) - (f**2)  # Eccentricity squared
+        N = a / math.sqrt(
+            1 - e2 * math.sin(lat_rad) ** 2
+        )  # Radius of curvature in the prime vertical
+        M = (
+            a * (1 - e2) / (1 - e2 * math.sin(lat_rad) ** 2) ** (3 / 2)
+        )  # Radius of curvature in the meridian
+
         lat_deg_change = meters / M  # Latitude change in degrees
         lon_deg_change = meters / (N * math.cos(lat_rad))  # Longitude change in degrees
-    
+
         # Convert changes to degrees by dividing by radians to degrees
         lat_deg_change = math.degrees(lat_deg_change)
         lon_deg_change = math.degrees(lon_deg_change)
-    
+
         return lat_deg_change, lon_deg_change
 
     def splitBySquare(  # noqa: N802
