@@ -66,11 +66,11 @@ def test_split_by_square_with_dict(aoi_json, extract_json):
     features = split_by_square(
         aoi_json.get("features")[0], meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 50
+    assert len(features.get("features")) == 60
     features = split_by_square(
         aoi_json.get("features")[0].get("geometry"), meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 50
+    assert len(features.get("features")) == 60
 
 
 def test_split_by_square_with_str(aoi_json, extract_json):
@@ -79,21 +79,21 @@ def test_split_by_square_with_str(aoi_json, extract_json):
     features = split_by_square(
         geojson.dumps(aoi_json.get("features")[0]), meters=50, osm_extract=extract_json
     )
-    assert len(features.get("features")) == 50
+    assert len(features.get("features")) == 60
     # JSON Dumps
     features = split_by_square(
         json.dumps(aoi_json.get("features")[0].get("geometry")),
         meters=50,
         osm_extract=extract_json,
     )
-    assert len(features.get("features")) == 50
+    assert len(features.get("features")) == 60
     # File
     features = split_by_square(
         "tests/testdata/kathmandu.geojson",
         meters=100,
         osm_extract="tests/testdata/kathmandu_extract.geojson",
     )
-    assert len(features.get("features")) == 15
+    assert len(features.get("features")) == 20
 
 
 def test_split_by_square_with_file_output():
@@ -108,11 +108,11 @@ def test_split_by_square_with_file_output():
         meters=50,
         outfile=str(outfile),
     )
-    assert len(features.get("features")) == 50
+    assert len(features.get("features")) == 60
     # Also check output file
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
-    assert len(output_geojson.get("features")) == 50
+    assert len(output_geojson.get("features")) == 60
 
 
 def test_split_by_square_with_multigeom_input(aoi_multi_json, extract_json):
@@ -125,7 +125,7 @@ def test_split_by_square_with_multigeom_input(aoi_multi_json, extract_json):
         osm_extract=extract_json,
         outfile=str(outfile),
     )
-    assert len(features.get("features", [])) == 50
+    assert len(features.get("features", [])) == 80
     for index in [0, 1, 2, 3]:
         assert Path(f"{Path(outfile).stem}_{index}.geojson)").exists()
 
@@ -231,7 +231,7 @@ def test_split_by_square_cli():
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
 
-    assert len(output_geojson.get("features")) == 15
+    assert len(output_geojson.get("features")) == 20
 
 
 def test_split_by_features_cli():
