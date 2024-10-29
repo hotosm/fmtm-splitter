@@ -155,11 +155,14 @@ class FMTMSplitter(object):
     def meters_to_degrees(
         self, meters: float, reference_lat: float
     ) -> Tuple[float, float]:
-        """Converts meters to degrees at a given latitude using WGS84 ellipsoidal calculations.
+        """Converts meters to degrees at a given latitude.
+
+        Using WGS84 ellipsoidal calculations.
 
         Args:
             meters (float): The distance in meters to convert.
-            reference_lat (float): The latitude at which to perform the conversion (in degrees).
+            reference_lat (float): The latitude at which to ,
+            perform the conversion (in degrees).
 
         Returns:
             Tuple[float, float]: Degree values for latitude and longitude.
@@ -176,15 +179,15 @@ class FMTMSplitter(object):
 
         # Applying formula
         e2 = (2 * f) - (f**2)  # Eccentricity squared
-        N = a / math.sqrt(
+        n = a / math.sqrt(
             1 - e2 * math.sin(lat_rad) ** 2
         )  # Radius of curvature in the prime vertical
-        M = (
+        m = (
             a * (1 - e2) / (1 - e2 * math.sin(lat_rad) ** 2) ** (3 / 2)
         )  # Radius of curvature in the meridian
 
-        lat_deg_change = meters / M  # Latitude change in degrees
-        lon_deg_change = meters / (N * math.cos(lat_rad))  # Longitude change in degrees
+        lat_deg_change = meters / m  # Latitude change in degrees
+        lon_deg_change = meters / (n * math.cos(lat_rad))  # Longitude change in degrees
 
         # Convert changes to degrees by dividing by radians to degrees
         lat_deg_change = math.degrees(lat_deg_change)
