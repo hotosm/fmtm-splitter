@@ -748,6 +748,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
         "--meters",
         nargs="?",
         const=50,
+        type=int,
         help="Size in meters if using square splitting",
     )
     parser.add_argument(
