@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.5.1 (2024-10-30)
+
+### Fix
+
+- typo in fmtm_splitter sql num_buildings substitution
+
 ## 1.5.0 (2024-10-30)
 
 ### Feat
