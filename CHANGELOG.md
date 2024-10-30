@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 1.5.0 (2024-10-30)
+
+### Feat
+
+- use geodetic conversion of meters to degrees
+
+### Fix
+
+- precommit errors
+- updated the tasks count in test cases of split by square
+- add type int in argument
+- avoid appending empty clipped polygons
+
+### Refactor
+
+- merge least feature count polygons with neighbouring polygons
+
 ## 1.4.0 (2024-10-24)
 
 ### Fix
