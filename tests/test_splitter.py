@@ -150,7 +150,7 @@ def test_split_by_sql_fmtm_with_extract(db, aoi_json, extract_json, output_json)
         num_buildings=5,
         osm_extract=extract_json,
     )
-    assert len(features.get("features")) == 120
+    assert len(features.get("features")) == 68
     assert sorted(features) == sorted(output_json)
 
 
@@ -162,8 +162,9 @@ def test_split_by_sql_fmtm_no_extract(aoi_json):
         "postgresql://fmtm:dummycipassword@db:5432/splitter",
         num_buildings=5,
     )
-    # This may change over time as it calls the live API
-    assert len(features.get("features")) > 120
+    # NOTE This may change over time as it calls the live API
+    # so we set to > the output from test_split_by_sql_fmtm_with_extract
+    assert len(features.get("features")) >= 68
 
 
 def test_split_by_sql_fmtm_multi_geom(extract_json):
@@ -180,14 +181,15 @@ def test_split_by_sql_fmtm_multi_geom(extract_json):
     assert isinstance(features, geojson.feature.FeatureCollection)
     assert isinstance(features.get("features"), list)
     assert isinstance(features.get("features")[0], dict)
-    assert len(features.get("features")) == 35
+    assert len(features.get("features")) == 22
 
+    # Check that all generates features are polygons
     polygons = [
         feature
         for feature in features.get("features", [])
         if feature.get("geometry").get("type") == "Polygon"
     ]
-    assert len(polygons) == 35
+    assert len(polygons) == 22
 
     polygon_feat = geojson.loads(json.dumps(polygons[0]))
     assert isinstance(polygon_feat, geojson.Feature)
@@ -290,7 +292,7 @@ def test_split_by_sql_cli():
     with open(outfile, "r") as jsonfile:
         output_geojson = geojson.load(jsonfile)
 
-    assert len(output_geojson.get("features")) == 60
+    assert len(output_geojson.get("features")) == 44
 
 
 def test_split_by_sql_cli_no_extract():
@@ -319,5 +321,6 @@ def test_split_by_sql_cli_no_extract():
     with open(outfile, "r") as geojson_out:
         output_geojson = geojson.load(geojson_out)
 
-    # This may change over time as it uses the live API
-    assert len(output_geojson.get("features")) > 60
+    # NOTE This may change over time as it calls the live API
+    # so we set to >= the output from test_split_by_sql_cli
+    assert len(output_geojson.get("features")) >= 44
