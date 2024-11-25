@@ -31,7 +31,7 @@ by the XLSForm, or a postgresql database.
 ### Via Command Line
 
 ```bash
-fmtm-splitter -b AOI
+fmtm-splitter -b AOI --meters 50
 fmtm-splitter -v -b AOI -s data.geojson
 fmtm-splitter -v -b AOI -s PG:colorado
 ```
