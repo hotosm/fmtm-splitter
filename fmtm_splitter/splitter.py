@@ -728,9 +728,7 @@ This program splits a Polygon (the Area Of Interest)
 be either the data extract used by the XLSForm, or a postgresql database.
 
     examples:
-        fmtm-splitter -b AOI
-        fmtm-splitter -v -b AOI -s data.geojson
-        fmtm-splitter -v -b AOI -s PG:colorado
+        fmtm-splitter -b AOI.geojson -o out.geojson --meters 100
 
         Where AOI is the boundary of the project as a polygon
         And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
