@@ -20,18 +20,19 @@
 import argparse
 import json
 import logging
+import math
 import sys
 from io import BytesIO
 from pathlib import Path
 from textwrap import dedent
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import geojson
 import numpy as np
 from geojson import Feature, FeatureCollection, GeoJSON
 from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
-from shapely.geometry import Polygon, shape
+from shapely.geometry import Polygon, box, shape
 from shapely.geometry.geo import mapping
 from shapely.ops import unary_union
 
@@ -151,6 +152,49 @@ class FMTMSplitter(object):
 
         return shape(features[0].get("geometry"))
 
+    def meters_to_degrees(
+        self, meters: float, reference_lat: float
+    ) -> Tuple[float, float]:
+        """Converts meters to degrees at a given latitude.
+
+        Using WGS84 ellipsoidal calculations.
+
+        Args:
+            meters (float): The distance in meters to convert.
+            reference_lat (float): The latitude at which to ,
+            perform the conversion (in degrees).
+
+        Returns:
+            Tuple[float, float]: Degree values for latitude and longitude.
+        """
+        # INFO:
+        # The geodesic distance is the shortest distance on the surface
+        # of an ellipsoidal model of the earth
+
+        lat_rad = math.radians(reference_lat)
+
+        # Using WGS84 parameters
+        a = 6378137.0  # Semi-major axis in meters
+        f = 1 / 298.257223563  # Flattening factor
+
+        # Applying formula
+        e2 = (2 * f) - (f**2)  # Eccentricity squared
+        n = a / math.sqrt(
+            1 - e2 * math.sin(lat_rad) ** 2
+        )  # Radius of curvature in the prime vertical
+        m = (
+            a * (1 - e2) / (1 - e2 * math.sin(lat_rad) ** 2) ** (3 / 2)
+        )  # Radius of curvature in the meridian
+
+        lat_deg_change = meters / m  # Latitude change in degrees
+        lon_deg_change = meters / (n * math.cos(lat_rad))  # Longitude change in degrees
+
+        # Convert changes to degrees by dividing by radians to degrees
+        lat_deg_change = math.degrees(lat_deg_change)
+        lon_deg_change = math.degrees(lon_deg_change)
+
+        return lat_deg_change, lon_deg_change
+
     def splitBySquare(  # noqa: N802
         self,
         meters: int,
@@ -170,14 +214,14 @@ class FMTMSplitter(object):
 
         xmin, ymin, xmax, ymax = self.aoi.bounds
 
-        # 1 meters is this factor in degrees
-        meter = 0.0000114
-        length = float(meters) * meter
-        width = float(meters) * meter
+        reference_lat = (ymin + ymax) / 2
+        length_deg, width_deg = self.meters_to_degrees(meters, reference_lat)
 
-        cols = list(np.arange(xmin, xmax + width, width))
-        rows = list(np.arange(ymin, ymax + length, length))
-        polygons = []
+        # Create grid columns and rows based on the AOI bounds
+        cols = np.arange(xmin, xmax + width_deg, width_deg)
+        rows = np.arange(ymin, ymax + length_deg, length_deg)
+
+        extract_geoms = []
         if extract_geojson:
             features = (
                 extract_geojson.get("features", extract_geojson)
@@ -185,18 +229,23 @@ class FMTMSplitter(object):
                 else extract_geojson.features
             )
             extract_geoms = [shape(feature["geometry"]) for feature in features]
-        else:
-            extract_geoms = []
 
+        # Generate grid polygons and clip them by AOI
+        polygons = []
         for x in cols[:-1]:
             for y in rows[:-1]:
-                grid_polygon = Polygon(
-                    [(x, y), (x + width, y), (x + width, y + length), (x, y + length)]
-                )
+                grid_polygon = box(x, y, x + width_deg, y + length_deg)
                 clipped_polygon = grid_polygon.intersection(self.aoi)
-                if not clipped_polygon.is_empty:
+
+                if clipped_polygon.is_empty:
+                    continue
+
+                # Check intersection with extract geometries if available
+                if extract_geoms:
                     if any(geom.within(clipped_polygon) for geom in extract_geoms):
                         polygons.append(clipped_polygon)
+                else:
+                    polygons.append(clipped_polygon)
 
         self.split_features = FeatureCollection(
             [Feature(geometry=mapping(poly)) for poly in polygons]
@@ -419,44 +468,11 @@ def split_by_square(
     # Parse AOI
     parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
+    extract_geojson = None
 
-    if not osm_extract:
-        config_data = dedent(
-            """
-          query:
-            select:
-            from:
-              - nodes
-              - ways_poly
-              - ways_line
-            where:
-              tags:
-                highway: not null
-                building: not null
-                waterway: not null
-                railway: not null
-                aeroway: not null
-            """
-        )
-        # Must be a BytesIO JSON object
-        config_bytes = BytesIO(config_data.encode())
-
-        pg = PostgresClient(
-            "underpass",
-            config_bytes,
-        )
-        # The total FeatureCollection area merged by osm-rawdata automatically
-        extract_geojson = pg.execQuery(
-            aoi_featcol,
-            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
-        )
-
-    else:
+    if osm_extract:
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
-    if not extract_geojson:
-        err = "A valid data extract must be provided."
-        log.error(err)
-        raise ValueError(err)
+
     # Handle multiple geometries passed
     if len(feat_array := aoi_featcol.get("features", [])) > 1:
         features = []
@@ -712,9 +728,7 @@ This program splits a Polygon (the Area Of Interest)
 be either the data extract used by the XLSForm, or a postgresql database.
 
     examples:
-        fmtm-splitter -b AOI
-        fmtm-splitter -v -b AOI -s data.geojson
-        fmtm-splitter -v -b AOI -s PG:colorado
+        fmtm-splitter -b AOI.geojson -o out.geojson --meters 100
 
         Where AOI is the boundary of the project as a polygon
         And OUTFILE is a MultiPolygon output file,which defaults to fmtm.geojson
@@ -736,6 +750,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
         "--meters",
         nargs="?",
         const=50,
+        type=int,
         help="Size in meters if using square splitting",
     )
     parser.add_argument(

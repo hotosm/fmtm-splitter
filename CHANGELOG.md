@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 1.5.1 (2024-10-30)
+
+### Fix
+
+- typo in fmtm_splitter sql num_buildings substitution
+
+## 1.5.0 (2024-10-30)
+
+### Feat
+
+- use geodetic conversion of meters to degrees
+
+### Fix
+
+- precommit errors
+- updated the tasks count in test cases of split by square
+- add type int in argument
+- avoid appending empty clipped polygons
+
+### Refactor
+
+- merge least feature count polygons with neighbouring polygons
+
+## 1.4.0 (2024-10-24)
+
+### Fix
+
+- add missed unsimplifiedtaskpolygons to table drop
+
+### Refactor
+
+- remove support for sqlalchemy connections (psycopg2 driver only)
+
+## 1.3.2 (2024-10-14)
+
+### Fix
+
+- remove osm-extracts from split by square
+- invalid inclusion of alias to get num_buildings by pre-commit
+
+### Refactor
+
+- move old splitting algorithm parts --> postgis_snippets
+
 ## 1.3.1 (2024-09-22)
 
 ### Fix
