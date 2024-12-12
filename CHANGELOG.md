@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2.0.0 (2024-12-12)
+
+### Feat
+
+- merge polygons smaller than 35% of perfect square polygon to neighbouring polygon
+
+### Fix
+
+- Update command line args
+- Update usage message for current reality
+
 ## 1.5.1 (2024-10-30)
 
 ### Fix
