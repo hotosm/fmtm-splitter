@@ -228,13 +228,15 @@ class FMTMSplitter(object):
 
         with create_connection(db) as conn:
             with conn.cursor() as cur:
+                # Drop the table if it exists
+                cur.execute("DROP TABLE IF EXISTS temp_polygons;")
                 # Create temporary table
                 cur.execute("""
                     CREATE TEMP TABLE temp_polygons (
                         id SERIAL PRIMARY KEY,
                         geom GEOMETRY(GEOMETRY, 4326),
                         area DOUBLE PRECISION
-                    )
+                    );
                 """)
 
                 extract_geoms = []
@@ -287,6 +289,7 @@ class FMTMSplitter(object):
                         small_polygon RECORD;
                         nearest_neighbor RECORD;
                     BEGIN
+                    DROP TABLE IF EXISTS small_polygons;
                     CREATE TEMP TABLE small_polygons As
                         SELECT id, geom, area
                         FROM temp_polygons
@@ -301,7 +304,6 @@ class FMTMSplitter(object):
                             ) AS shared_bound
                         FROM temp_polygons lp
                         WHERE id NOT IN (SELECT id FROM small_polygons)
-                        AND ST_Touches(small_polygon.geom, lp.geom)
                         AND ST_Touches(small_polygon.geom, lp.geom)
                         AND ST_GEOMETRYTYPE(
                         ST_INTERSECTION(small_polygon.geom, geom)
