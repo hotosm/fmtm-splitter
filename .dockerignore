@@ -4,7 +4,8 @@
 # Allow files and directories
 !fmtm_splitter
 !pyproject.toml
-!pdm.lock
+!uv.lock
 !entrypoint.sh
 !README.md
 !LICENSE.md
+!api

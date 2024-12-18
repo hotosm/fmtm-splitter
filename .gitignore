@@ -53,7 +53,7 @@ NEWS
 *.out
 *.app
 
-# PDM
+# PDM (old)
 pdm.toml
 .pdm-python
 __pypackages__

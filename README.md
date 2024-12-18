@@ -196,4 +196,4 @@ fmtm-splitter
 ```
 
 > Note: the `output` directory in this repo is mounted in the container
-> to `/data/output`. To persist data, input and output should be placed here.
+> to `/opt/output`. To persist data, input and output should be placed here.
