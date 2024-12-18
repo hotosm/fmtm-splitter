@@ -108,6 +108,8 @@ ENTRYPOINT ["/container-entrypoint.sh"]
 WORKDIR /opt
 # Copy Python deps from build to runtime
 COPY --from=build /opt/python /opt/python
+# Add fmtm-splitter module to Python packages
+COPY "fmtm_splitter/" "/opt/python/lib/python$PYTHON_IMG_TAG/site-packages/fmtm_splitter/"
 # Add non-root user, permissions
 RUN useradd -u 1001 -m -c "user account" -d /home/appuser -s /bin/false appuser \
     && chown -R appuser:appuser /opt /home/appuser \
@@ -136,6 +138,7 @@ EOT
 
 # Used during CI workflows (as root), with docs/test dependencies pre-installed
 FROM debug AS ci
+# NOTE tests are added at runtime via a bind mount
 # Override entrypoint, as not possible in Github action
 ENTRYPOINT [""]
 CMD [""]
@@ -143,9 +146,8 @@ CMD [""]
 
 # Override CMD for API debug
 FROM debug AS api-debug
-# Add API code & fmtm-splitter module
+# Add API code
 COPY api/ /opt/api/
-COPY fmtm_splitter/ /opt/python/lib/python3.12/site-packages/fmtm_splitter/
 CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", \
     "--listen", "0.0.0.0:5678", "-m", "uvicorn", "api.main:app", \
     "--host", "0.0.0.0", "--port", "8000", "--workers", "1", \
@@ -156,7 +158,6 @@ CMD ["python", "-Xfrozen_modules=off", "-m", "debugpy", \
 FROM runtime AS api-prod
 # Add API code & fmtm-splitter module
 COPY api/ /opt/api/
-COPY fmtm_splitter/ /opt/python/lib/python3.12/site-packages/fmtm_splitter/
 # Change to non-root user
 USER appuser
 # Sanity check to see if build succeeded
