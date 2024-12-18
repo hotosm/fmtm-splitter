@@ -17,7 +17,7 @@
 ARG PYTHON_IMG_TAG=3.10
 
 
-FROM docker.io/python:${PYTHON_IMG_TAG}-slim-bookworm as base
+FROM docker.io/python:${PYTHON_IMG_TAG}-slim-bookworm AS base
 ARG COMMIT_REF
 ARG PYTHON_IMG_TAG
 ARG MAINTAINER=admin@hotosm.org
@@ -39,7 +39,7 @@ ENV LC_ALL en_US.UTF-8
 
 
 
-FROM base as extract-deps
+FROM base AS extract-deps
 WORKDIR /opt/python
 COPY pyproject.toml pdm.lock /opt/python/
 RUN pip install --no-cache-dir --upgrade pip \
@@ -50,7 +50,7 @@ RUN pdm export --prod > requirements.txt \
 
 
 
-FROM base as build-wheel
+FROM base AS build-wheel
 WORKDIR /build
 COPY . .
 RUN pip install pdm==2.6.1 \
@@ -58,7 +58,7 @@ RUN pip install pdm==2.6.1 \
 
 
 
-FROM base as build
+FROM base AS build
 WORKDIR /opt/python
 RUN set -ex \
     && apt-get update \
@@ -84,7 +84,7 @@ RUN whl_file=$(find . -name '*-py3-none-any.whl' -type f) \
 
 
 
-FROM base as runtime
+FROM base AS runtime
 ARG PYTHON_IMG_TAG
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -115,7 +115,7 @@ COPY entrypoint.sh /container-entrypoint.sh
 
 
 
-FROM runtime as ci
+FROM runtime AS ci
 ARG PYTHON_IMG_TAG
 COPY --from=extract-deps \
     /opt/python/requirements-ci.txt /opt/python/
@@ -140,7 +140,7 @@ CMD [""]
 
 
 
-FROM runtime as prod
+FROM runtime AS prod
 # Pre-compile packages to .pyc (init speed gains)
 RUN python -c "import compileall; compileall.compile_path(maxlevels=10, quiet=1)" \
     && chmod +x /container-entrypoint.sh
