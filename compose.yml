@@ -27,21 +27,22 @@ services:
     container_name: fmtm-splitter
     volumes:
       # Mount local package
-      - ./fmtm_splitter:/usr/local/lib/python3.10/site-packages/fmtm_splitter
-      # - ../osm-rawdata/osm_rawdata:/usr/local/lib/python3.10/site-packages/osm_rawdata
+      - ./fmtm_splitter:/opt/python/lib/python3.12/site-packages/fmtm_splitter:ro
+      # - ../osm-rawdata/osm_rawdata:/opt/python/lib/python3.12/site-packages/osm_rawdata:ro
       # Mount local tests
-      - ./tests:/data/tests
+      - ./tests:/opt/tests:ro
       # For output data
-      - ./output:/data/output
+      - ./output:/opt/output
     depends_on:
       db:
         condition: service_healthy
     networks:
       - net
-    restart: "never"
+    restart: "no"
     command: "pytest"
 
   db:
+    profiles: ["", "api"]
     image: "postgis/postgis:17-3.5-alpine"
     container_name: fmtm-splitter-db
     environment:

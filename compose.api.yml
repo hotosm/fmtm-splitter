@@ -1,0 +1,50 @@
+# Copyright (c) Humanitarian OpenStreetMap Team
+# This file is part of fmtm-splitter.
+#
+#     fmtm-splitter is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#
+#     fmtm-splitter is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fmtm-splitter.  If not, see <https:#www.gnu.org/licenses/>.
+#
+
+networks:
+  net:
+    name: fmtm-splitter
+
+services:
+  api:
+    profiles: ["", "api"]
+    image: "ghcr.io/hotosm/fmtm-splitter-api:debug"
+    build:
+      target: api-debug
+      args:
+        API: True
+    container_name: fmtm-splitter-api
+    volumes:
+      # Mount API code for hot-reload
+      - ./api:/opt/api:ro
+      # Mount local package
+      - ./fmtm_splitter:/opt/python/lib/python3.12/site-packages/fmtm_splitter:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DEBUG: True
+    ports:
+      - "8032:8000"
+    networks:
+      - net
+    restart: "unless-stopped"
+
+  db:
+    extends:
+      file: compose.yml
+      service: db

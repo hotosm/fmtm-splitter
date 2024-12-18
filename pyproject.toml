@@ -1,6 +1,6 @@
 [project]
 name = "fmtm-splitter"
-dynamic = ["version"]
+version = "2.0.0"
 description = "A utility for splitting an AOI into multiple tasks."
 authors = [
     {name = "Ivan Gayton", email = "ivan.gayton@hotosm.org"},
@@ -18,7 +18,7 @@ dependencies = [
 requires-python = ">=3.10"
 readme = "README.md"
 license = "GPL-3.0-only"
-keywords = ["fmtm", "odk", "hot"]
+keywords = ["fmtm", "aoi", "split", "postgis", "hot"]
 classifiers = [
     "Topic :: Utilities",
     "Topic :: Scientific/Engineering :: GIS",
@@ -27,38 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 
-[project.urls]
-homepage = "https://hotosm.github.io/fmtm-splitter"
-documentation = "https://hotosm.github.io/fmtm-splitter"
-repository = "https://github.com/hotosm/fmtm-splitter"
-
-[build-system]
-requires = ["pdm-pep517>=1.1.4"]
-build-backend = "pdm.pep517.api"
-
-[tool.pytest.ini_options]
-addopts = "-ra -q -p no:warnings"
-testpaths = [
-    "tests",
-]
-pythonpath = "fmtm_splitter"
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-version = "2.0.0"
-version_files = [
-    "pyproject.toml:version",
-    "fmtm_splitter/__version__.py",
-    "Makefile:VERSION",
-]
-update_changelog_on_bump = true
-
-[tool.pdm]
-version = {from = "fmtm_splitter/__version__.py"}
-[tool.pdm.build]
-includes = ["fmtm_splitter"]
-source-includes = ["LICENSE.md", "README.md"]
-[tool.pdm.dev-dependencies]
+[dependency-groups]
 dev = [
     "commitizen>=3.6.0",
     "pre-commit>=3.3.3",
@@ -78,6 +47,34 @@ docs = [
     "mkdocstrings-python>=1.5.2",
     "mkdocs-exclude>=1.0.2",
 ]
+api = [
+    "brotli==1.1.0",
+    "geojson-pydantic==1.1.2",
+    "litestar==2.13.0",
+    "uvicorn==0.34.0",
+]
+
+[project.urls]
+homepage = "https://hotosm.github.io/fmtm-splitter"
+documentation = "https://hotosm.github.io/fmtm-splitter"
+repository = "https://github.com/hotosm/fmtm-splitter"
+
+[tool.pytest.ini_options]
+addopts = "-ra -q -p no:warnings"
+testpaths = [
+    "tests",
+]
+pythonpath = "fmtm_splitter"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "2.0.0"
+version_files = [
+    "pyproject.toml:version",
+    "fmtm_splitter/__version__.py",
+    "Makefile:VERSION",
+]
+update_changelog_on_bump = true
 
 [tool.ruff]
 fix = true
@@ -103,6 +100,3 @@ dialect = "postgres"
 templater = "placeholder"
 [tool.sqlfluff.templater.placeholder]
 param_style = "pyformat"  # For pyformat SQL %(num_buildings)s
-
-[project.scripts]
-fmtm-splitter = "fmtm_splitter.splitter:main"
