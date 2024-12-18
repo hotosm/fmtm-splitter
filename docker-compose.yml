@@ -48,6 +48,8 @@ services:
       - POSTGRES_USER=fmtm
       - POSTGRES_PASSWORD=dummycipassword
       - POSTGRES_DB=splitter
+    volumes:
+      - ./scripts/20_enable_sfcgal.sql:/docker-entrypoint-initdb.d/20_enable_sfcgal.sql:ro
     ports:
       - "5439:5432"
     networks:
