@@ -73,4 +73,5 @@ nav:
       - Versioning: https://docs.hotosm.org/dev-guide/repo-management/version-control/#creating-releases
   - Usage: usage.md
   - API: api.md
+  - Splitting Algorithm: splitting-algorithm.md
   - Testing via UI: testing-via-ui.md
