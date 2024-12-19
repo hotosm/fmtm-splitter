@@ -43,7 +43,8 @@ services:
 
   db:
     profiles: ["", "api"]
-    image: "postgis/postgis:17-3.5-alpine"
+    # image: "postgis/postgis:17-3.5-alpine"
+    image: "postgis/postgis:17-master"
     container_name: fmtm-splitter-db
     environment:
       - POSTGRES_USER=fmtm
