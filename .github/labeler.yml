@@ -15,7 +15,7 @@ dependency:
   - changed-files:
       - any-glob-to-any-file:
           - pyproject.toml
-          - pdm.lock
+          - uv.lock
 docs:
   - changed-files:
       - any-glob-to-any-file:

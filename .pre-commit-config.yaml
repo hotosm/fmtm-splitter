@@ -1,7 +1,7 @@
 repos:
   # Versioning: Commit messages & changelog
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.0.0
+    rev: v4.1.0
     hooks:
       - id: commitizen
         stages: [commit-msg]
@@ -9,7 +9,7 @@ repos:
   # Lint / autoformat: Python code
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: "v0.8.1"
+    rev: "v0.8.3"
     hooks:
       # Run the linter
       - id: ruff
@@ -19,7 +19,7 @@ repos:
 
   # Lint & Autoformat: SQL
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 3.2.5
+    rev: 3.3.0
     hooks:
       - id: sqlfluff-lint
         files: ^fmtm_splitter/fmtm_algorithm.sql
@@ -41,7 +41,7 @@ repos:
             --ignore-unknown,
             --no-error-on-unmatched-pattern,
             "!fmtm-splitter/fmtm-splitter_osm_buildings/**",
-            "!postgis_snippets/**",
+            "!contrib/postgis_snippets/**",
             "!CHANGELOG.md",
             "!tests/testdata/*",
           ]
@@ -56,7 +56,7 @@ repos:
             --ignore,
             CHANGELOG.md,
             --ignore,
-            postgis_snippets/**/*.md,
+            contrib/postgis_snippets/**/*.md,
             --ignore,
             fmtm_splitter/fmtm-splitter_osm_buildings/*.md,
           ]

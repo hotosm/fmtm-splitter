@@ -1,0 +1,65 @@
+{
+  "name": "@hotosm/aoi-splitter",
+  "version": "0.0.0",
+  "description": "A web component splitting areas into sub-tasks.",
+  "homepage": "https://github.com/hotosm/fmtm-splitter#readme",
+  "author": {
+    "name": "HOTOSM",
+    "email": "sysadmin@hotosm.org"
+  },
+  "contributors": [
+    {
+      "name": "Sam Woodcock",
+      "url": "https://github.com/spwoodcock"
+    }
+  ],
+  "license": "AGPL-3.0-only",
+  "main": "./dist/aoi-splitter.js",
+  "module": "./dist/aoi-splitter.js",
+  "type": "module",
+  "types": "./dist/aoi-splitter.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/aoi-splitter.d.ts",
+      "import": "./dist/aoi-splitter.js",
+      "default": "./dist/aoi-splitter.js"
+    },
+    "./style.css": "./dist/aoi-splitter.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hotosm/fmtm-splitter"
+  },
+  "scripts": {
+    "build:dts": "tsc --emitDeclarationOnly",
+    "build:js": "scripts/build.js",
+    "build": "pnpm run build:js",
+    "dev": "pnpm run build && pnpm run --dir site dev",
+    "preview": "pnpm run build && pnpm run --dir site preview"
+  },
+  "dependencies": {
+    "@hotosm/ui": "^0.2.0-b6",
+    "@openlayers-elements/core": "^0.4.0",
+    "@openlayers-elements/maps": "^0.4.0",
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.15",
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-tailwindcss": "^1.2.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "~5.6.2"
+  },
+  "peerDependencies": {
+    "@shoelace-style/shoelace": "^2.17.1",
+    "ol": "^7.5.0"
+  },
+  "peerDependencies: comments": {
+    "ol": "PINNED TO MATCH @openlayers-elements/core",
+    "@shoelace-style/shoelace": "PINNED TO MATCH @hotosm/ui"
+  }
+}
