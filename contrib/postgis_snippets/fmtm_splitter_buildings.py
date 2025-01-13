@@ -36,7 +36,7 @@ def split_by_buildings(
     dbd: list,  # database host, dbname, user, password
 ):
     """Split the polygon by buildings in the database using an SQL query."""
-    dbstring = f"PG:host={dbd[0]} dbname={dbd[1]} " f"user={dbd[2]} password={dbd[3]}"
+    dbstring = f"PG:host={dbd[0]} dbname={dbd[1]} user={dbd[2]} password={dbd[3]}"
     dbshell = psycopg2.connect(
         host=dbd[0], database=dbd[1], user=dbd[2], password=dbd[3]
     )
