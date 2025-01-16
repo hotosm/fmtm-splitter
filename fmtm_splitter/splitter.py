@@ -24,11 +24,11 @@ import math
 import sys
 from io import BytesIO
 from pathlib import Path
-from textwrap import dedent
 from typing import Optional, Tuple, Union
 
 import geojson
 import numpy as np
+import psycopg2
 from geojson import Feature, FeatureCollection, GeoJSON
 from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
@@ -344,12 +344,11 @@ class FMTMSplitter(object):
                 self.split_features = cur.fetchone()[0]
         return self.split_features
 
-    def splitBySQL(  # noqa: N802
+    def splitBySQL(
         self,
         sql: str,
-        db: Union[str, connection],
-        buildings: Optional[int] = None,
-        osm_extract: Optional[Union[dict, FeatureCollection]] = None,
+        splitter_cursor: psycopg2.extensions.cursor,
+        num_buildings: Optional[int] = None,
     ) -> FeatureCollection:
         """Split the polygon by features in the database using an SQL query.
 
@@ -357,127 +356,36 @@ class FMTMSplitter(object):
 
         Args:
             sql (str): The SQL query to execute
-            db (str, psycopg2.extensions.connection): The db url, format:
-                postgresql://myusername:mypassword@myhost:5432/mydatabase
-                OR an psycopg2 connection object object that is reused.
-                Passing an connection object prevents requiring additional
-                database connections to be spawned.
-            buildings (int): The number of buildings in each task
-            osm_extract (dict, FeatureCollection): an OSM extract geojson,
-                containing building polygons, or linestrings.
+            splitter_cursor (str, psycopg2.extensions.cursor): The db connection cursor
+            num_buildings (int): The number of buildings in each task
 
         Returns:
             data (FeatureCollection): A multipolygon of all the task boundaries.
         """
-        # Validation
-        if buildings and not osm_extract:
-            msg = (
-                "To use the FMTM splitting algo, an OSM data extract must be passed "
-                "via param `osm_extract` as a geojson dict or FeatureCollection."
-            )
-            log.error(msg)
-            raise ValueError(msg)
-
-        # Run custom SQL
-        if not buildings or not osm_extract:
-            log.info(
-                "No `buildings` or `osm_extract` params passed, executing custom SQL"
-            )
-            # FIXME untested
-            conn = create_connection(db)
-            splitter_cursor = conn.cursor()
-            log.debug("Running custom splitting algorithm")
-            splitter_cursor.execute(sql)
-            features = splitter_cursor.fetchall()[0][0]["features"]
-            if features:
-                log.info(f"Query returned {len(features)} features")
+        try:
+            if not num_buildings:
+                log.info("Executing custom SQL for splitting")
+                splitter_cursor.execute(sql)
             else:
-                log.info("Query returned no features")
+                log.info(
+                    "Executing task splitting algorithm with {num_buildings} features"
+                )
+                splitter_cursor.execute(sql, {"num_buildings": num_buildings})
+
+            split_features = splitter_cursor.fetchall()
+
+            if not split_features:
+                raise ValueError("SQL query returned no split_features.")
+
+            features = split_features[0][0]["features"]
+
+            log.info(f"Query returned {len(features)} features.")
             self.split_features = FeatureCollection(features)
+
             return self.split_features
-
-        # Get existing db engine, or create new one
-        conn = create_connection(db)
-
-        # Generate db tables if not exist
-        log.debug("Generating required temp tables")
-        create_tables(conn)
-
-        # Add aoi to project_aoi table
-        aoi_to_postgis(conn, self.aoi)
-
-        def json_str_to_dict(json_item: Union[str, dict]) -> dict:
-            """Convert a JSON string to dict."""
-            if isinstance(json_item, dict):
-                return json_item
-            if isinstance(json_item, str):
-                try:
-                    return json.loads(json_item)
-                except json.JSONDecodeError:
-                    msg = f"Error decoding key in GeoJSON: {json_item}"
-                    log.error(msg)
-                    # Set tags to empty, skip feature
-                    return {}
-
-        # Insert data extract into db, using same cursor
-        log.debug("Inserting data extract into db")
-        cur = conn.cursor()
-        for feature in osm_extract["features"]:
-            # NOTE must handle format generated from FMTMSplitter __init__
-            wkb_element = shape(feature["geometry"]).wkb_hex
-            properties = feature.get("properties", {})
-            if "tags" in properties.keys():
-                # Sometimes tags are placed under tags key
-                tags = properties.get("tags", {})
-            else:
-                # Sometimes tags are directly in properties
-                tags = properties
-
-            # Handle nested 'tags' key if present
-            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
-            osm_id = properties.get("osm_id")
-
-            # Common attributes for db tables
-            common_args = dict(osm_id=osm_id, geom=wkb_element, tags=tags)
-
-            # Insert building polygons
-            if tags.get("building") == "yes":
-                insert_geom(cur, "ways_poly", **common_args)
-
-            # Insert highway/waterway/railway polylines
-            elif any(key in tags for key in ["highway", "waterway", "railway"]):
-                insert_geom(cur, "ways_line", **common_args)
-
-        # Use raw sql for view generation & remainder of script
-        # TODO get geom from project_aoi table instead of wkb string
-        log.debug("Creating db view with intersecting polylines")
-        view = (
-            "DROP VIEW IF EXISTS lines_view;"
-            "CREATE VIEW lines_view AS SELECT "
-            "tags,geom FROM ways_line WHERE "
-            "ST_Intersects(ST_SetSRID(CAST(%s AS GEOMETRY), 4326), geom)"
-        )
-        cur.execute(view, (self.aoi.wkb_hex,))
-        # Close current cursor
-        cur.close()
-
-        splitter_cursor = conn.cursor()
-        log.debug("Running task splitting algorithm")
-        splitter_cursor.execute(sql, {"num_buildings": buildings})
-
-        features = splitter_cursor.fetchall()[0][0]["features"]
-        if features:
-            log.info(f"Query returned {len(features)} features")
-        else:
-            log.info("Query returned no features")
-
-        self.split_features = FeatureCollection(features)
-
-        # Drop tables & close (+commit) db connection
-        drop_tables(conn)
-        close_connection(conn)
-
-        return self.split_features
+        except Exception as e:
+            log.error(f"Error during SQL execution: {e}")
+            raise RuntimeError(f"Failed to execute SQL query: {e}") from e
 
     def splitByFeature(  # noqa: N802
         self,
@@ -599,135 +507,208 @@ def split_by_square(
     return split_features
 
 
+def parse_geojson_input(input_data: Union[str, FeatureCollection]) -> FeatureCollection:
+    """Parse input data into a valid FeatureCollection."""
+    return FMTMSplitter.input_to_geojson(input_data)
+
+
+def prepare_sql_query(sql_file: Optional[Union[str, Path]], default_path: Path) -> str:
+    """Load SQL query from a file or fallback to default."""
+    if not sql_file:
+        sql_file = default_path
+    with open(sql_file, "r") as sql:
+        return sql.read()
+
+
+def generate_osm_extract(
+    aoi_featcol: FeatureCollection, extract_type: str
+) -> FeatureCollection:
+    """Generate OSM extract based on the specified type from AOI FeatureCollection."""
+    config_data_map = {
+        "extracts": """
+        select:
+        from:
+            - nodes
+            - ways_poly
+            - ways_line
+        where:
+            tags:
+            - building: not null
+            - highway: not null
+            - waterway: not null
+            - railway: not null
+            - aeroway: not null
+        """,
+        "lines": """
+        select:
+        from:
+            - nodes
+            - ways_line
+        where:
+            tags:
+            - highway: not null
+            - waterway: not null
+            - railway: not null
+            - aeroway: not null
+        """,
+    }
+    config_data = config_data_map.get(extract_type)
+    if not config_data:
+        raise ValueError(f"Invalid extract type: {extract_type}")
+
+    config_bytes = BytesIO(config_data.encode())
+    pg = PostgresClient("underpass", config_bytes)
+    return pg.execQuery(
+        aoi_featcol, extra_params={"fileName": "fmtm_splitter", "useStWithin": False}
+    )
+
+
+def json_str_to_dict(json_item: Union[str, dict]) -> dict:
+    """Convert a JSON string to dict."""
+    if isinstance(json_item, dict):
+        return json_item
+    if isinstance(json_item, str):
+        try:
+            return json.loads(json_item)
+        except json.JSONDecodeError:
+            msg = f"Error decoding key in GeoJSON: {json_item}"
+            log.error(msg)
+            # Set tags to empty, skip feature
+            return {}
+
+
+def insert_features_to_db(features, conn, extract_type: str):
+    """Insert features into the database."""
+    for feature in features:
+        geom = shape(feature["geometry"]).wkb_hex
+        properties = feature.get("properties", {})
+        tags = properties.get("tags", properties)
+        if tags:
+            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
+
+        if extract_type == "custom":
+            insert_geom(conn, "ways_poly", geom=geom)
+        elif extract_type == "lines":
+            if any(key in tags for key in ["highway", "waterway", "railway"]):
+                osm_id = properties.get("osm_id")
+                insert_geom(conn, "ways_line", osm_id=osm_id, geom=geom, tags=tags)
+        elif extract_type == "extracts":
+            osm_id = properties.get("osm_id")
+            if tags.get("building") == "yes":
+                insert_geom(conn, "ways_poly", osm_id=osm_id, geom=geom, tags=tags)
+            elif any(key in tags for key in ["highway", "waterway", "railway"]):
+                insert_geom(conn, "ways_line", osm_id=osm_id, geom=geom, tags=tags)
+
+
 def split_by_sql(
     aoi: Union[str, FeatureCollection],
     db: Union[str, connection],
     sql_file: Optional[Union[str, Path]] = None,
     num_buildings: Optional[int] = None,
     outfile: Optional[str] = None,
-    osm_extract: Optional[Union[str, FeatureCollection]] = None,
+    custom_features: Optional[Union[str, FeatureCollection]] = None,
 ) -> FeatureCollection:
-    """Split an AOI with a custom SQL query or default FMTM query.
+    """Split an AOI with a custom SQL query or the default FMTM query.
 
-    Note: either sql_file, or num_buildings must be passed.
-
-    If sql_file is not passed, the default FMTM splitter will be used.
-    The query will optimise on the following:
-    - Attempt to divide the aoi into tasks that contain approximately the
-        number of buildings from `num_buildings`.
-    - Split the task areas on major features such as roads an rivers, to
-      avoid traversal of these features across task areas.
-
-    Also has handling for multiple geometries within FeatureCollection object.
+    FIXME this requires some work to function with custom SQL.
 
     Args:
-        aoi(str, FeatureCollection): Input AOI, either a file path,
-            GeoJSON string, or FeatureCollection object.
-        db (str, psycopg2.extensions.connection): The db url, format:
-            postgresql://myusername:mypassword@myhost:5432/mydatabase
-            OR an psycopg2 connection object that is reused.
-            Passing an connection object prevents requring additional
-            database connections to be spawned.
-        sql_file(str): Path to custom splitting algorithm.
-        num_buildings(str): The number of buildings to optimise the FMTM
-            splitting algorithm with (approx buildings per generated feature).
-        outfile(str): Output to a GeoJSON file on disk.
-        osm_extract (str, FeatureCollection): an OSM extract geojson,
-            containing building polygons, or linestrings.
-            Optional param, if not included an extract is generated for you.
-            It is recommended to leave this param as default, unless you know
-            what you are doing.
+        aoi: The input AOI as GeoJSON or a FeatureCollection.
+        db: Database connection string or object.
+        sql_file: Path to custom SQL file. Uses default if not provided.
+        num_buildings: Number of buildings per split.
+        outfile: Output file path to save the split AOI as GeoJSON.
+        custom_features: Additional features to include in processing.
 
     Returns:
-        features (FeatureCollection): A multipolygon of all the task boundaries.
+        FeatureCollection: The split AOI as a FeatureCollection.
+
+    Raises:
+        ValueError: If neither `sql_file` nor `num_buildings` is provided.
     """
     if not sql_file and not num_buildings:
-        err = "Either sql_file or num_buildings must be passed."
-        log.error(err)
-        raise ValueError(err)
+        raise ValueError("Either `sql_file` or `num_buildings` must be provided.")
 
-    # Use FMTM splitter of num_buildings set, else use custom SQL
-    if not sql_file:
-        sql_file = Path(__file__).parent / "fmtm_algorithm.sql"
+    default_sql_path = Path(__file__).parent / "fmtm_algorithm.sql"
+    query = prepare_sql_query(sql_file, default_sql_path)
 
-    with open(sql_file, "r") as sql:
-        query = sql.read()
-
-    # Parse AOI
-    parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
+    parsed_aoi = parse_geojson_input(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
 
-    # Extracts and parse extract geojson
-    if not osm_extract:
-        # We want all polylines for splitting:
-        # buildings, highways, waterways, railways
-        config_data = dedent(
-            """
-            select:
-            from:
-              - nodes
-              - ways_poly
-              - ways_line
-            where:
-              tags:
-                - building: not null
-                  highway: not null
-                  waterway: not null
-                  railway: not null
-                  aeroway: not null
-        """
-        )
-        # Must be a BytesIO JSON object
-        config_bytes = BytesIO(config_data.encode())
-
-        pg = PostgresClient(
-            "underpass",
-            config_bytes,
-        )
-        # The total FeatureCollection area merged by osm-rawdata automatically
-        extract_geojson = pg.execQuery(
-            aoi_featcol,
-            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
+    if len(features := aoi_featcol.get("features", [])) > 1:
+        return handle_multiple_aoi_features(
+            features, db, sql_file, num_buildings, outfile, custom_features
         )
 
-    else:
-        extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
+    splitter = FMTMSplitter(aoi_featcol)
 
-    if not extract_geojson:
-        err = "A valid data extract must be provided."
-        log.error(err)
-        raise ValueError(err)
+    # Setup database
+    conn = create_connection(db)
+    try:
+        create_tables(conn)
+        aoi_to_postgis(conn, splitter.aoi)
+        process_features_for_db(custom_features, aoi_featcol, conn)
+        setup_lines_view(conn, splitter.aoi.wkb_hex)
 
-    # Handle multiple geometries passed
-    if len(feat_array := aoi_featcol.get("features", [])) > 1:
-        features = []
-        for index, feat in enumerate(feat_array):
-            featcol = split_by_sql(
-                FeatureCollection(features=[feat]),
-                db,
-                sql_file,
-                num_buildings,
-                f"{Path(outfile).stem}_{index}.geojson)" if outfile else None,
-                osm_extract,
-            )
-            feats = featcol.get("features", [])
-            if feats:
-                features += feats
-        # Parse FeatCols into single FeatCol
-        split_features = FeatureCollection(features)
-    else:
-        splitter = FMTMSplitter(aoi_featcol)
-        split_features = splitter.splitBySQL(
-            query, db, num_buildings, osm_extract=extract_geojson
-        )
+        with conn.cursor() as cur:
+            split_features = splitter.splitBySQL(query, cur, num_buildings)
+
         if not split_features:
-            msg = "Failed to generate split features."
-            log.error(msg)
-            raise ValueError(msg)
+            raise ValueError("Failed to generate split features.")
+
+        # Save to file if required
         if outfile:
             splitter.outputGeojson(outfile)
 
-    return split_features
+        return split_features
+
+    except Exception as e:
+        raise RuntimeError(f"Error in split_by_sql: {e}") from e
+    finally:
+        drop_tables(conn)
+        close_connection(conn)
+
+
+def process_features_for_db(custom_features, aoi_featcol, conn):
+    """Process custom features or OSM extracts and insert them into the database."""
+    if custom_features:
+        custom_buildings = parse_geojson_input(custom_features)
+        insert_features_to_db(custom_buildings["features"], conn, "custom")
+
+        extract_lines = generate_osm_extract(aoi_featcol, "lines")
+        if extract_lines:
+            insert_features_to_db(extract_lines["features"], conn, "lines")
+    else:
+        extract_buildings = generate_osm_extract(aoi_featcol, "extracts")
+        insert_features_to_db(extract_buildings["features"], conn, "extracts")
+
+
+def setup_lines_view(conn, geometry):
+    """Create a database view for line features intersecting the AOI."""
+    view_sql = """
+        DROP VIEW IF EXISTS lines_view;
+        CREATE VIEW lines_view AS
+        SELECT tags, geom
+        FROM ways_line
+        WHERE ST_Intersects(ST_SetSRID(CAST(%s AS GEOMETRY), 4326), geom)
+    """
+    with conn.cursor() as cur:
+        cur.execute(view_sql, (geometry,))
+    cur.close()
+
+
+def handle_multiple_aoi_features(
+    features, db, sql_file, num_buildings, outfile, custom_features
+):
+    """Handle AOIs with multiple features by splitting them recursively."""
+    all_features = []
+    for index, feature in enumerate(features):
+        sub_output = f"{Path(outfile).stem}_{index}.geojson" if outfile else None
+        sub_features = split_by_sql(
+            feature, db, sql_file, num_buildings, sub_output, custom_features
+        )
+        all_features.extend(sub_features.get("features", []))
+    return FeatureCollection(all_features)
 
 
 def split_by_features(

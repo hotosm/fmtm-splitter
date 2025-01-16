@@ -85,16 +85,16 @@ def create_tables(conn: psycopg2.extensions.connection):
 
         CREATE TABLE ways_poly (
             id SERIAL PRIMARY KEY,
-            osm_id VARCHAR,
-            geom GEOMETRY(GEOMETRY, 4326),
-            tags JSONB
+            osm_id VARCHAR NULL,
+            geom GEOMETRY(GEOMETRY, 4326) NOT NULL,
+            tags JSONB NULL
         );
 
         CREATE TABLE ways_line (
             id SERIAL PRIMARY KEY,
-            osm_id VARCHAR,
-            geom GEOMETRY(GEOMETRY, 4326),
-            tags JSONB
+            osm_id VARCHAR NULL,
+            geom GEOMETRY(GEOMETRY, 4326) NOT NULL,
+            tags JSONB NULL
         );
     """
     log.debug(
@@ -142,31 +142,58 @@ def aoi_to_postgis(conn: psycopg2.extensions.connection, geom: Polygon) -> None:
     """
     log.debug("Adding AOI to project_aoi table")
 
-    sql = """
+    sql_insert = """
         INSERT INTO project_aoi (geom)
-        VALUES (ST_SetSRID(CAST(%s AS GEOMETRY), 4326));
+        VALUES (ST_SetSRID(CAST(%s AS GEOMETRY), 4326))
+        RETURNING id, geom;
     """
 
-    cur = conn.cursor()
-    cur.execute(sql, (geom.wkb_hex,))
-    cur.close()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql_insert, (geom.wkb_hex,))
+        cur.close()
+
+    except Exception as e:
+        log.error(f"Error during database operations: {e}")
+        conn.rollback()  # Rollback in case of error
 
 
-def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> None:
+def insert_geom(
+    conn: psycopg2.extensions.connection, table_name: str, **kwargs
+) -> None:
     """Insert an OSM geometry into the database.
 
-    Does not commit the values automatically.
+    Handles both cases: with or without tags and osm_id.
 
     Args:
-        cur (psycopg2.extensions.cursor): The PostgreSQL cursor.
+        conn (psycopg2.extensions.connection): The PostgreSQL connection.
         table_name (str): The name of the table to insert data into.
         **kwargs: Keyword arguments representing the values to be inserted.
 
     Returns:
         None
     """
-    query = (
-        f"INSERT INTO {table_name}(geom,osm_id,tags) "
-        "VALUES (%(geom)s,%(osm_id)s,%(tags)s)"
-    )
-    cur.execute(query, kwargs)
+    if not kwargs.get("tags") and not kwargs.get("osm_id"):
+        # For custom extracts with no tags or osm_id
+        query = f"INSERT INTO {table_name}(geom) VALUES (%(geom)s) RETURNING id, geom"
+        params = {"geom": kwargs["geom"]}
+    else:
+        query = (
+            f"INSERT INTO {table_name}(geom, osm_id, tags) "
+            "VALUES (%(geom)s, %(osm_id)s, %(tags)s) "
+            "RETURNING id, osm_id, tags"
+        )
+        params = {
+            "geom": kwargs["geom"],
+            "osm_id": kwargs.get("osm_id"),
+            "tags": kwargs.get("tags"),
+        }
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+        cur.close()
+
+    except Exception as e:
+        log.error(f"Error executing query: {e}")
+        conn.rollback()  # Rollback transaction on error
