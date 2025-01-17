@@ -524,43 +524,48 @@ def generate_osm_extract(
     aoi_featcol: FeatureCollection, extract_type: str
 ) -> FeatureCollection:
     """Generate OSM extract based on the specified type from AOI FeatureCollection."""
-    config_data_map = {
-        "extracts": """
-        select:
-        from:
-            - nodes
-            - ways_poly
-            - ways_line
-        where:
-            tags:
-            - building: not null
-            - highway: not null
-            - waterway: not null
-            - railway: not null
-            - aeroway: not null
-        """,
-        "lines": """
-        select:
-        from:
-            - nodes
-            - ways_line
-        where:
-            tags:
-            - highway: not null
-            - waterway: not null
-            - railway: not null
-            - aeroway: not null
-        """,
-    }
-    config_data = config_data_map.get(extract_type)
-    if not config_data:
-        raise ValueError(f"Invalid extract type: {extract_type}")
+    try:
+        config_data_map = {
+            "extracts": """
+            select:
+            from:
+                - nodes
+                - ways_poly
+                - ways_line
+            where:
+                tags:
+                - building: not null
+                - highway: not null
+                - waterway: not null
+                - railway: not null
+                - aeroway: not null
+            """,
+            "lines": """
+            select:
+            from:
+                - nodes
+                - ways_line
+            where:
+                tags:
+                - highway: not null
+                - waterway: not null
+                - railway: not null
+                - aeroway: not null
+            """,
+        }
+        config_data = config_data_map.get(extract_type)
+        if not config_data:
+            raise ValueError(f"Invalid extract type: {extract_type}")
 
-    config_bytes = BytesIO(config_data.encode())
-    pg = PostgresClient("underpass", config_bytes)
-    return pg.execQuery(
-        aoi_featcol, extra_params={"fileName": "fmtm_splitter", "useStWithin": False}
-    )
+        config_bytes = BytesIO(config_data.encode())
+        pg = PostgresClient("underpass", config_bytes)
+        return pg.execQuery(
+            aoi_featcol,
+            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
+        )
+    except Exception as e:
+        log.error(f"Error during OSM extract generation: {e}")
+        raise RuntimeError(f"Failed to generate OSM extract: {e}") from e
 
 
 def json_str_to_dict(json_item: Union[str, dict]) -> dict:
