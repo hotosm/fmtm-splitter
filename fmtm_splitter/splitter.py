@@ -20,17 +20,18 @@
 import argparse
 import json
 import logging
-import math
 import sys
-from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 import geojson
 import numpy as np
 import psycopg2
+from app.fmtm_splitter.parsers import (
+    meters_to_degrees,
+    prepare_sql_query,
+)
 from geojson import Feature, FeatureCollection, GeoJSON
-from osm_rawdata.postgres import PostgresClient
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, box, shape
 from shapely.ops import unary_union
@@ -41,7 +42,8 @@ from fmtm_splitter.db import (
     create_connection,
     create_tables,
     drop_tables,
-    insert_geom,
+    process_features_for_db,
+    setup_lines_view,
 )
 
 # Instantiate logger
@@ -151,49 +153,6 @@ class FMTMSplitter(object):
 
         return shape(features[0].get("geometry"))
 
-    def meters_to_degrees(
-        self, meters: float, reference_lat: float
-    ) -> Tuple[float, float]:
-        """Converts meters to degrees at a given latitude.
-
-        Using WGS84 ellipsoidal calculations.
-
-        Args:
-            meters (float): The distance in meters to convert.
-            reference_lat (float): The latitude at which to ,
-            perform the conversion (in degrees).
-
-        Returns:
-            Tuple[float, float]: Degree values for latitude and longitude.
-        """
-        # INFO:
-        # The geodesic distance is the shortest distance on the surface
-        # of an ellipsoidal model of the earth
-
-        lat_rad = math.radians(reference_lat)
-
-        # Using WGS84 parameters
-        a = 6378137.0  # Semi-major axis in meters
-        f = 1 / 298.257223563  # Flattening factor
-
-        # Applying formula
-        e2 = (2 * f) - (f**2)  # Eccentricity squared
-        n = a / math.sqrt(
-            1 - e2 * math.sin(lat_rad) ** 2
-        )  # Radius of curvature in the prime vertical
-        m = (
-            a * (1 - e2) / (1 - e2 * math.sin(lat_rad) ** 2) ** (3 / 2)
-        )  # Radius of curvature in the meridian
-
-        lat_deg_change = meters / m  # Latitude change in degrees
-        lon_deg_change = meters / (n * math.cos(lat_rad))  # Longitude change in degrees
-
-        # Convert changes to degrees by dividing by radians to degrees
-        lat_deg_change = math.degrees(lat_deg_change)
-        lon_deg_change = math.degrees(lon_deg_change)
-
-        return lat_deg_change, lon_deg_change
-
     def splitBySquare(  # noqa: N802
         self,
         meters: int,
@@ -220,7 +179,7 @@ class FMTMSplitter(object):
         xmin, ymin, xmax, ymax = self.aoi.bounds
 
         reference_lat = (ymin + ymax) / 2
-        length_deg, width_deg = self.meters_to_degrees(meters, reference_lat)
+        length_deg, width_deg = meters_to_degrees(meters, reference_lat)
 
         # Create grid columns and rows based on the AOI bounds
         cols = np.arange(xmin, xmax + width_deg, width_deg)
@@ -507,125 +466,6 @@ def split_by_square(
     return split_features
 
 
-def parse_geojson_input(input_data: Union[str, FeatureCollection]) -> FeatureCollection:
-    """Parse input data into a valid FeatureCollection."""
-    return FMTMSplitter.input_to_geojson(input_data)
-
-
-def prepare_sql_query(sql_file: Optional[Union[str, Path]], default_path: Path) -> str:
-    """Load SQL query from a file or fallback to default."""
-    if not sql_file:
-        sql_file = default_path
-    with open(sql_file, "r") as sql:
-        return sql.read()
-
-
-def generate_osm_extract(
-    aoi_featcol: FeatureCollection, extract_type: str
-) -> FeatureCollection:
-    """Generate OSM extract based on the specified type from AOI FeatureCollection."""
-    try:
-        config_data_map = {
-            "extracts": """
-            select:
-            from:
-                - nodes
-                - ways_poly
-                - ways_line
-            where:
-                tags:
-                - building: not null
-                - highway: not null
-                - waterway: not null
-                - railway: not null
-                - aeroway: not null
-            """,
-            "lines": """
-            select:
-            from:
-                - nodes
-                - ways_line
-            where:
-                tags:
-                - highway: not null
-                - waterway: not null
-                - railway: not null
-                - aeroway: not null
-            """,
-        }
-        config_data = config_data_map.get(extract_type)
-        if not config_data:
-            raise ValueError(f"Invalid extract type: {extract_type}")
-
-        config_bytes = BytesIO(config_data.encode())
-        pg = PostgresClient("underpass", config_bytes)
-        return pg.execQuery(
-            aoi_featcol,
-            extra_params={"fileName": "fmtm_splitter", "useStWithin": False},
-        )
-    except Exception as e:
-        log.error(f"Error during OSM extract generation: {e}")
-        raise RuntimeError(f"Failed to generate OSM extract: {e}") from e
-
-
-def json_str_to_dict(json_item: Union[str, dict]) -> dict:
-    """Convert a JSON string to dict."""
-    if isinstance(json_item, dict):
-        return json_item
-    if isinstance(json_item, str):
-        try:
-            return json.loads(json_item)
-        except json.JSONDecodeError:
-            msg = f"Error decoding key in GeoJSON: {json_item}"
-            log.error(msg)
-            # Set tags to empty, skip feature
-            return {}
-
-
-def insert_features_to_db(
-    features: List[Dict[str, Any]],
-    conn: psycopg2.extensions.connection,
-    extract_type: str,
-) -> None:
-    """Insert features into the database with optimized performance.
-
-    Args:
-        features: List of features containing geometry and properties.
-        conn: Database connection object.
-        extract_type: Type of data extraction ("custom", "lines", or "extracts").
-    """
-    ways_poly_batch = []
-    ways_line_batch = []
-
-    for feature in features:
-        geom = shape(feature["geometry"]).wkb_hex
-        properties = feature.get("properties", {})
-        tags = properties.get("tags", properties)
-
-        if tags:
-            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
-
-        osm_id = properties.get("osm_id")
-
-        # Process based on extract_type
-        if extract_type == "custom":
-            ways_poly_batch.append({"geom": geom})
-        elif extract_type == "lines":
-            if any(key in tags for key in ["highway", "waterway", "railway"]):
-                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
-        elif extract_type == "extracts":
-            if tags.get("building") == "yes":
-                ways_poly_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
-            elif any(key in tags for key in ["highway", "waterway", "railway"]):
-                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
-
-    # Perform batch inserts
-    if ways_poly_batch:
-        insert_geom(conn, "ways_poly", ways_poly_batch)
-    if ways_line_batch:
-        insert_geom(conn, "ways_line", ways_line_batch)
-
-
 def split_by_sql(
     aoi: Union[str, FeatureCollection],
     db: Union[str, connection],
@@ -658,11 +498,12 @@ def split_by_sql(
     default_sql_path = Path(__file__).parent / "fmtm_algorithm.sql"
     query = prepare_sql_query(sql_file, default_sql_path)
 
-    parsed_aoi = parse_geojson_input(aoi)
+    parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
+    custom_features = FMTMSplitter.geojson_to_featcol(custom_features)
 
     if len(features := aoi_featcol.get("features", [])) > 1:
-        return handle_multiple_aoi_features(
+        return split_multiple_aoi_features(
             features, db, sql_file, num_buildings, outfile, custom_features
         )
 
@@ -695,39 +536,7 @@ def split_by_sql(
         close_connection(conn)
 
 
-def process_features_for_db(
-    aoi_featcol: FeatureCollection,
-    conn: psycopg2.extensions.connection,
-    custom_features: Optional[List[Dict]] = None,
-) -> None:
-    """Process custom features or OSM extracts and insert them into the database."""
-    if custom_features:
-        custom_buildings = parse_geojson_input(custom_features)
-        insert_features_to_db(custom_buildings["features"], conn, "custom")
-
-        extract_lines = generate_osm_extract(aoi_featcol, "lines")
-        if extract_lines:
-            insert_features_to_db(extract_lines["features"], conn, "lines")
-    else:
-        extract_buildings = generate_osm_extract(aoi_featcol, "extracts")
-        insert_features_to_db(extract_buildings["features"], conn, "extracts")
-
-
-def setup_lines_view(conn, geometry):
-    """Create a database view for line features intersecting the AOI."""
-    view_sql = """
-        DROP VIEW IF EXISTS lines_view;
-        CREATE VIEW lines_view AS
-        SELECT tags, geom
-        FROM ways_line
-        WHERE ST_Intersects(ST_SetSRID(CAST(%s AS GEOMETRY), 4326), geom)
-    """
-    with conn.cursor() as cur:
-        cur.execute(view_sql, (geometry,))
-    cur.close()
-
-
-def handle_multiple_aoi_features(
+def split_multiple_aoi_features(
     features, db, sql_file, num_buildings, outfile, custom_features
 ):
     """Handle AOIs with multiple features by splitting them recursively."""
@@ -917,7 +726,7 @@ be either the data extract used by the XLSForm, or a postgresql database.
             sql_file=args.custom,
             num_buildings=args.number,
             outfile=args.outfile,
-            osm_extract=args.extract,
+            custom_features=args.extract,
         )
     # Split by feature using geojson
     elif args.source and args.source[3:] != "PG:":
