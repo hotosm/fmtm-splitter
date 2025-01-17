@@ -17,7 +17,7 @@
 """DB models for temporary tables in splitBySQL."""
 
 import logging
-from typing import Union
+from typing import Any, Dict, List, Union
 
 import psycopg2
 from psycopg2.extensions import register_adapter
@@ -159,41 +159,35 @@ def aoi_to_postgis(conn: psycopg2.extensions.connection, geom: Polygon) -> None:
 
 
 def insert_geom(
-    conn: psycopg2.extensions.connection, table_name: str, **kwargs
+    conn: psycopg2.extensions.connection, table_name: str, data: List[Dict[str, Any]]
 ) -> None:
-    """Insert an OSM geometry into the database.
+    """Insert geometries into the database.
+
+    Such as:
+    - LineStrings
+    - Polygons
 
     Handles both cases: with or without tags and osm_id.
 
     Args:
         conn (psycopg2.extensions.connection): The PostgreSQL connection.
         table_name (str): The name of the table to insert data into.
-        **kwargs: Keyword arguments representing the values to be inserted.
+        data(List[dict]): Values of features to be inserted; geom, tags.
 
     Returns:
         None
     """
-    if not kwargs.get("tags") and not kwargs.get("osm_id"):
-        # For custom extracts with no tags or osm_id
-        query = f"INSERT INTO {table_name}(geom) VALUES (%(geom)s) RETURNING id, geom"
-        params = {"geom": kwargs["geom"]}
-    else:
-        query = (
-            f"INSERT INTO {table_name}(geom, osm_id, tags) "
-            "VALUES (%(geom)s, %(osm_id)s, %(tags)s) "
-            "RETURNING id, osm_id, tags"
-        )
-        params = {
-            "geom": kwargs["geom"],
-            "osm_id": kwargs.get("osm_id"),
-            "tags": kwargs.get("tags"),
-        }
+    placeholders = ", ".join(data[0].keys())
+    values = [tuple(record.values()) for record in data]
 
+    sql_query = f"""
+    INSERT INTO {table_name} ({placeholders})
+    VALUES ({", ".join(["%s"] * len(data[0]))})
+    """
     try:
-        with conn.cursor() as cur:
-            cur.execute(query, params)
-        cur.close()
-
+        with conn.cursor() as cursor:
+            cursor.executemany(sql_query, values)
+            conn.commit()
     except Exception as e:
         log.error(f"Error executing query: {e}")
         conn.rollback()  # Rollback transaction on error

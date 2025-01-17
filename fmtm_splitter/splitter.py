@@ -24,7 +24,7 @@ import math
 import sys
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geojson
 import numpy as np
@@ -577,27 +577,48 @@ def json_str_to_dict(json_item: Union[str, dict]) -> dict:
             return {}
 
 
-def insert_features_to_db(features, conn, extract_type: str):
-    """Insert features into the database."""
+def insert_features_to_db(
+    features: List[Dict[str, Any]],
+    conn: psycopg2.extensions.connection,
+    extract_type: str,
+) -> None:
+    """Insert features into the database with optimized performance.
+
+    Args:
+        features: List of features containing geometry and properties.
+        conn: Database connection object.
+        extract_type: Type of data extraction ("custom", "lines", or "extracts").
+    """
+    ways_poly_batch = []
+    ways_line_batch = []
+
     for feature in features:
         geom = shape(feature["geometry"]).wkb_hex
         properties = feature.get("properties", {})
         tags = properties.get("tags", properties)
+
         if tags:
             tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
 
+        osm_id = properties.get("osm_id")
+
+        # Process based on extract_type
         if extract_type == "custom":
-            insert_geom(conn, "ways_poly", geom=geom)
+            ways_poly_batch.append({"geom": geom})
         elif extract_type == "lines":
             if any(key in tags for key in ["highway", "waterway", "railway"]):
-                osm_id = properties.get("osm_id")
-                insert_geom(conn, "ways_line", osm_id=osm_id, geom=geom, tags=tags)
+                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
         elif extract_type == "extracts":
-            osm_id = properties.get("osm_id")
             if tags.get("building") == "yes":
-                insert_geom(conn, "ways_poly", osm_id=osm_id, geom=geom, tags=tags)
+                ways_poly_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
             elif any(key in tags for key in ["highway", "waterway", "railway"]):
-                insert_geom(conn, "ways_line", osm_id=osm_id, geom=geom, tags=tags)
+                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
+
+    # Perform batch inserts
+    if ways_poly_batch:
+        insert_geom(conn, "ways_poly", ways_poly_batch)
+    if ways_line_batch:
+        insert_geom(conn, "ways_line", ways_line_batch)
 
 
 def split_by_sql(
@@ -647,7 +668,7 @@ def split_by_sql(
     try:
         create_tables(conn)
         aoi_to_postgis(conn, splitter.aoi)
-        process_features_for_db(custom_features, aoi_featcol, conn)
+        process_features_for_db(aoi_featcol, conn, custom_features)
         setup_lines_view(conn, splitter.aoi.wkb_hex)
 
         with conn.cursor() as cur:
@@ -669,7 +690,11 @@ def split_by_sql(
         close_connection(conn)
 
 
-def process_features_for_db(custom_features, aoi_featcol, conn):
+def process_features_for_db(
+    aoi_featcol: FeatureCollection,
+    conn: psycopg2.extensions.connection,
+    custom_features: Optional[List[Dict]] = None,
+) -> None:
     """Process custom features or OSM extracts and insert them into the database."""
     if custom_features:
         custom_buildings = parse_geojson_input(custom_features)
