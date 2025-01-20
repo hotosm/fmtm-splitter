@@ -27,7 +27,7 @@ from typing import Optional, Union
 import geojson
 import numpy as np
 import psycopg2
-from app.fmtm_splitter.parsers import (
+from fmtm_splitter.parsers import (
     meters_to_degrees,
     prepare_sql_query,
 )
@@ -500,7 +500,8 @@ def split_by_sql(
 
     parsed_aoi = FMTMSplitter.input_to_geojson(aoi)
     aoi_featcol = FMTMSplitter.geojson_to_featcol(parsed_aoi)
-    custom_features = FMTMSplitter.geojson_to_featcol(custom_features)
+    if custom_features:
+        custom_features = FMTMSplitter.geojson_to_featcol(custom_features)
 
     if len(features := aoi_featcol.get("features", [])) > 1:
         return split_multiple_aoi_features(

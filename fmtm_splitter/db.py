@@ -100,6 +100,15 @@ def create_tables(conn: psycopg2.extensions.connection):
             geom GEOMETRY(GEOMETRY, 4326) NOT NULL,
             tags JSONB NULL
         );
+
+        -- Create indexes for geospatial and query performance
+        CREATE INDEX idx_project_aoi_geom ON project_aoi USING GIST(geom);
+
+        CREATE INDEX idx_ways_poly_geom ON ways_poly USING GIST(geom);
+        CREATE INDEX idx_ways_poly_tags ON ways_poly USING GIN(tags);
+
+        CREATE INDEX idx_ways_line_geom ON ways_line USING GIST(geom);
+        CREATE INDEX idx_ways_line_tags ON ways_line USING GIN(tags);
     """
     log.debug(
         "Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'"
