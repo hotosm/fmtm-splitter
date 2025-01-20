@@ -27,10 +27,6 @@ from typing import Optional, Union
 import geojson
 import numpy as np
 import psycopg2
-from fmtm_splitter.parsers import (
-    meters_to_degrees,
-    prepare_sql_query,
-)
 from geojson import Feature, FeatureCollection, GeoJSON
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, box, shape
@@ -44,6 +40,10 @@ from fmtm_splitter.db import (
     drop_tables,
     process_features_for_db,
     setup_lines_view,
+)
+from fmtm_splitter.parsers import (
+    meters_to_degrees,
+    prepare_sql_query,
 )
 
 # Instantiate logger
