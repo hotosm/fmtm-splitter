@@ -22,15 +22,11 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import geojson
 import numpy as np
 import psycopg2
-from fmtm_splitter.parsers import (
-    meters_to_degrees,
-    prepare_sql_query,
-)
 from geojson import Feature, FeatureCollection, GeoJSON
 from psycopg2.extensions import connection
 from shapely.geometry import Polygon, box, shape
@@ -44,6 +40,10 @@ from fmtm_splitter.db import (
     drop_tables,
     process_features_for_db,
     setup_lines_view,
+)
+from fmtm_splitter.parsers import (
+    meters_to_degrees,
+    prepare_sql_query,
 )
 
 # Instantiate logger
@@ -439,29 +439,24 @@ def split_by_square(
         extract_geojson = FMTMSplitter.input_to_geojson(osm_extract)
 
     # Handle multiple geometries passed
-    if len(feat_array := aoi_featcol.get("features", [])) > 1:
-        features = []
-        for index, feat in enumerate(feat_array):
-            featcol = split_by_square(
-                FeatureCollection(features=[feat]),
-                db,
-                meters,
-                None,
-                f"{Path(outfile).stem}_{index}.geojson)" if outfile else None,
-            )
-            if feats := featcol.get("features", []):
-                features += feats
-        # Parse FeatCols into single FeatCol
-        split_features = FeatureCollection(features)
-    else:
-        splitter = FMTMSplitter(aoi_featcol)
-        split_features = splitter.splitBySquare(meters, db, extract_geojson)
-        if not split_features:
-            msg = "Failed to generate split features."
-            log.error(msg)
-            raise ValueError(msg)
-        if outfile:
-            splitter.outputGeojson(outfile)
+    if len(features := aoi_featcol.get("features", [])) > 1:
+        return split_multiple_aoi_features(
+            features,
+            split_by_square,
+            db=db,
+            meters=meters,
+            osm_extract=extract_geojson,
+            outfile=outfile,
+        )
+
+    splitter = FMTMSplitter(aoi_featcol)
+    split_features = splitter.splitBySquare(meters, db, extract_geojson)
+    if not split_features:
+        msg = "Failed to generate split features."
+        log.error(msg)
+        raise ValueError(msg)
+    if outfile:
+        splitter.outputGeojson(outfile)
 
     return split_features
 
@@ -505,7 +500,13 @@ def split_by_sql(
 
     if len(features := aoi_featcol.get("features", [])) > 1:
         return split_multiple_aoi_features(
-            features, db, sql_file, num_buildings, outfile, custom_features
+            features,
+            split_by_sql,
+            db=db,
+            sql_file=sql_file,
+            num_buildings=num_buildings,
+            outfile=outfile,
+            custom_features=custom_features,
         )
 
     splitter = FMTMSplitter(aoi_featcol)
@@ -538,14 +539,15 @@ def split_by_sql(
 
 
 def split_multiple_aoi_features(
-    features, db, sql_file, num_buildings, outfile, custom_features
-):
+    features: List[Feature], split_function, **kwargs
+) -> FeatureCollection:
     """Handle AOIs with multiple features by splitting them recursively."""
     all_features = []
+    outfile = kwargs.pop("outfile")
     for index, feature in enumerate(features):
         sub_output = f"{Path(outfile).stem}_{index}.geojson" if outfile else None
-        sub_features = split_by_sql(
-            feature, db, sql_file, num_buildings, sub_output, custom_features
+        sub_features = split_function(
+            FeatureCollection(features=[feature]), outfile=sub_output, **kwargs
         )
         all_features.extend(sub_features.get("features", []))
     return FeatureCollection(all_features)
