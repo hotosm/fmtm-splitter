@@ -17,12 +17,16 @@
 """DB models for temporary tables in splitBySQL."""
 
 import logging
-from typing import Union
+from typing import Any, Dict, List, Optional, Union
 
 import psycopg2
+from geojson import FeatureCollection
 from psycopg2.extensions import register_adapter
 from psycopg2.extras import Json, register_uuid
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, shape
+
+from fmtm_splitter.osm_extract import generate_osm_extract
+from fmtm_splitter.parsers import json_str_to_dict
 
 log = logging.getLogger(__name__)
 
@@ -85,17 +89,26 @@ def create_tables(conn: psycopg2.extensions.connection):
 
         CREATE TABLE ways_poly (
             id SERIAL PRIMARY KEY,
-            osm_id VARCHAR,
-            geom GEOMETRY(GEOMETRY, 4326),
-            tags JSONB
+            osm_id VARCHAR NULL,
+            geom GEOMETRY(GEOMETRY, 4326) NOT NULL,
+            tags JSONB NULL
         );
 
         CREATE TABLE ways_line (
             id SERIAL PRIMARY KEY,
-            osm_id VARCHAR,
-            geom GEOMETRY(GEOMETRY, 4326),
-            tags JSONB
+            osm_id VARCHAR NULL,
+            geom GEOMETRY(GEOMETRY, 4326) NOT NULL,
+            tags JSONB NULL
         );
+
+        -- Create indexes for geospatial and query performance
+        CREATE INDEX idx_project_aoi_geom ON project_aoi USING GIST(geom);
+
+        CREATE INDEX idx_ways_poly_geom ON ways_poly USING GIST(geom);
+        CREATE INDEX idx_ways_poly_tags ON ways_poly USING GIN(tags);
+
+        CREATE INDEX idx_ways_line_geom ON ways_line USING GIST(geom);
+        CREATE INDEX idx_ways_line_tags ON ways_line USING GIN(tags);
     """
     log.debug(
         "Running tables create command for 'project_aoi', 'ways_poly', 'ways_line'"
@@ -142,31 +155,127 @@ def aoi_to_postgis(conn: psycopg2.extensions.connection, geom: Polygon) -> None:
     """
     log.debug("Adding AOI to project_aoi table")
 
-    sql = """
+    sql_insert = """
         INSERT INTO project_aoi (geom)
-        VALUES (ST_SetSRID(CAST(%s AS GEOMETRY), 4326));
+        VALUES (ST_SetSRID(CAST(%s AS GEOMETRY), 4326))
+        RETURNING id, geom;
     """
 
-    cur = conn.cursor()
-    cur.execute(sql, (geom.wkb_hex,))
-    cur.close()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql_insert, (geom.wkb_hex,))
+        cur.close()
+
+    except Exception as e:
+        log.error(f"Error during database operations: {e}")
+        conn.rollback()  # Rollback in case of error
 
 
-def insert_geom(cur: psycopg2.extensions.cursor, table_name: str, **kwargs) -> None:
-    """Insert an OSM geometry into the database.
+def insert_geom(
+    conn: psycopg2.extensions.connection, table_name: str, data: List[Dict[str, Any]]
+) -> None:
+    """Insert geometries into the database.
 
-    Does not commit the values automatically.
+    Such as:
+    - LineStrings
+    - Polygons
+
+    Handles both cases: with or without tags and osm_id.
 
     Args:
-        cur (psycopg2.extensions.cursor): The PostgreSQL cursor.
+        conn (psycopg2.extensions.connection): The PostgreSQL connection.
         table_name (str): The name of the table to insert data into.
-        **kwargs: Keyword arguments representing the values to be inserted.
+        data(List[dict]): Values of features to be inserted; geom, tags.
 
     Returns:
         None
     """
-    query = (
-        f"INSERT INTO {table_name}(geom,osm_id,tags) "
-        "VALUES (%(geom)s,%(osm_id)s,%(tags)s)"
-    )
-    cur.execute(query, kwargs)
+    placeholders = ", ".join(data[0].keys())
+    values = [tuple(record.values()) for record in data]
+
+    sql_query = f"""
+    INSERT INTO {table_name} ({placeholders})
+    VALUES ({", ".join(["%s"] * len(data[0]))})
+    """
+    try:
+        with conn.cursor() as cursor:
+            cursor.executemany(sql_query, values)
+            conn.commit()
+    except Exception as e:
+        log.error(f"Error executing query: {e}")
+        conn.rollback()  # Rollback transaction on error
+
+
+def insert_features_to_db(
+    features: List[Dict[str, Any]],
+    conn: psycopg2.extensions.connection,
+    extract_type: str,
+) -> None:
+    """Insert features into the database with optimized performance.
+
+    Args:
+        features: List of features containing geometry and properties.
+        conn: Database connection object.
+        extract_type: Type of data extraction ("custom", "lines", or "extracts").
+    """
+    ways_poly_batch = []
+    ways_line_batch = []
+
+    for feature in features:
+        geom = shape(feature["geometry"]).wkb_hex
+        properties = feature.get("properties", {})
+        tags = properties.get("tags", properties)
+
+        if tags:
+            tags = json_str_to_dict(tags).get("tags", json_str_to_dict(tags))
+
+        osm_id = properties.get("osm_id")
+
+        # Process based on extract_type
+        if extract_type == "custom":
+            ways_poly_batch.append({"geom": geom})
+        elif extract_type == "lines":
+            if any(key in tags for key in ["highway", "waterway", "railway"]):
+                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
+        elif extract_type == "extracts":
+            if tags.get("building") == "yes":
+                ways_poly_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
+            elif any(key in tags for key in ["highway", "waterway", "railway"]):
+                ways_line_batch.append({"osm_id": osm_id, "geom": geom, "tags": tags})
+
+    # Perform batch inserts
+    if ways_poly_batch:
+        insert_geom(conn, "ways_poly", ways_poly_batch)
+    if ways_line_batch:
+        insert_geom(conn, "ways_line", ways_line_batch)
+
+
+def process_features_for_db(
+    aoi_featcol: FeatureCollection,
+    conn: psycopg2.extensions.connection,
+    custom_features: Optional[List[Dict]] = None,
+) -> None:
+    """Process custom features or OSM extracts and insert them into the database."""
+    if custom_features:
+        insert_features_to_db(custom_features["features"], conn, "custom")
+
+        extract_lines = generate_osm_extract(aoi_featcol, "lines")
+        if extract_lines:
+            insert_features_to_db(extract_lines["features"], conn, "lines")
+    else:
+        extract_buildings = generate_osm_extract(aoi_featcol, "extracts")
+        insert_features_to_db(extract_buildings["features"], conn, "extracts")
+
+
+def setup_lines_view(conn, geometry):
+    """Create a database view for line features intersecting the AOI."""
+    view_sql = """
+        DROP VIEW IF EXISTS lines_view;
+        CREATE VIEW lines_view AS
+        SELECT tags, geom
+        FROM ways_line
+        WHERE ST_Intersects(ST_SetSRID(CAST(%s AS GEOMETRY), 4326), geom)
+    """
+    with conn.cursor() as cur:
+        cur.execute(view_sql, (geometry,))
+    cur.close()
