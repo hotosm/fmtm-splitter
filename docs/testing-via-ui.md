@@ -29,7 +29,7 @@ If you wish to view the split data output in a more visual way:
 1. Setup FMTM:
 
    ```bash
-   git clone https://github.com/hotosm/fmtm.git
+   git clone https://github.com/hotosm/field-tm.git
    cd fmtm
    cp .env.example .env
 
