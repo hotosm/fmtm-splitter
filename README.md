@@ -4,6 +4,18 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/hotosm/fmtm-splitter/main/docs/images/hot_logo.png" style="width: 200px;" alt="HOT"></a>
 </p>
+
+
+> [!WARNING]
+>
+> Archived.
+>
+> This repo was moved to be a package in a monorepo.
+>
+> https://github.com/hotosm/fmtm/tree/development/src/backend/packages/area-splitter
+>
+> It was also renamed fmtm-splitter --> area-splitter in PyPi.
+
 <p align="center">
   <em>A utility for splitting an AOI into multiple tasks.</em>
 </p>
